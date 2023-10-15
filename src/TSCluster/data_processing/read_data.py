@@ -113,7 +113,7 @@ def read_data(
 
     gt = None
     if gt_data_dir:
-        gt = pickle.load(open(gt_data_dir),'rb')
+        gt = pickle.load(open(gt_data_dir,'rb'))
         if len(gt) != N:
             raise ValueError('Dimension mismatch between TS and groundtruth data')
 

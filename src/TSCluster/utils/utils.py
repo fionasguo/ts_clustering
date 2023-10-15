@@ -30,6 +30,7 @@ def create_logger():
     logging.basicConfig(filename=logfilename + '.log',
                         format="%(message)s",
                         level=logging.DEBUG)
+    logging.getLogger('matplotlib.font_manager').disabled = True
 
 
 def read_command_args(args):
@@ -72,7 +73,7 @@ def read_config(args):
     # default values
     args['lr'] = 0.0005
     args['batch_size'] = 32
-    args['epoch'] = 1000
+    args['epoch'] = 1 # 1000
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50

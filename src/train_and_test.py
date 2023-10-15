@@ -5,6 +5,7 @@ import csv
 from TSCluster import set_seed, get_training_args, create_logger
 from TSCluster import read_data
 from TSCluster import Trainer
+from TSCluster import evaluate
 
 
 def train(data, args):
@@ -17,7 +18,7 @@ def train(data, args):
     trainer.train()
 
     logging.info(
-        f"Finished training {args['train_domain']} data. Time: {time.time()-start_time}"
+        f"Finished training data. Time: {time.time()-start_time}"
     )
 
     return trainer
@@ -25,32 +26,28 @@ def train(data, args):
 
 def test(data,args,trainer=None):
     start_time = time.time()
-    logging.info('Start processing test data ...')
 
     logging.info('============ Evaluation on Test Data ============= \n')
     # evaluate with the best model just got from training or with the model given from config
     if trainer is not None:
-        eval_model_path = args['output_dir'] + '/best_model.pth'
+        eval_model_path = args['output_dir'] + '/model_weights.h5'
     elif args.get('trained_model_dir') is not None:
         eval_model_path = args['trained_model_dir']
     else:
         raise ValueError('Please provide a model for evaluation.')
 
     # TODO: implement evaluation with gt
-    test_accu, mf_preds = evaluate(data,
-                            args['batch_size'],
-                            model_path=eval_model_path,
-                            test=True)
-    logging.info('Macro F1 of the %s TEST dataset: %f' %
-                    ('target', test_accu))
+    evaluate(data, eval_model_path, args)
+    # logging.info('Macro F1 of the %s TEST dataset: %f' %
+    #                 ('target', test_accu))
 
-    # output predictions
-    with open(args['output_dir'] + '/mf_preds.csv','w',newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(mf_preds)
+    # # output predictions
+    # with open(args['output_dir'] + '/mf_preds.csv','w',newline='') as f:
+    #     writer = csv.writer(f)
+    #     writer.writerows(mf_preds)
 
     logging.info(
-        f"Finished evaluating test data {args['test_domain']}. Time: {time.time()-start_time}"
+        f"Finished evaluating test data. Time: {time.time()-start_time}"
     )
 
 

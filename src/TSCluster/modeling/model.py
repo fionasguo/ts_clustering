@@ -110,7 +110,7 @@ def get_predictor(input_dim, hid_dim, weight_decay):
 # 1. Transformer parameters. (N, h, dropout)
 # 2. Normalization
 
-class SimSiam(tf.keras.Model):
+class SimSiam(Model):
     def __init__(self, args):
         super().__init__()
         self.args = args

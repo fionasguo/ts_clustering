@@ -1,0 +1,97 @@
+import random
+import numpy as np
+
+## generate positive examples by bootstrapping
+def generate_positive_example(ts_data, full_ts_range, n_feat, seed=3):
+    """
+    Generate one positive example using bootstrapping
+
+    Args:
+        ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
+                demo shape: N * demo_dim
+                other array shape: N * max_triplet_len
+        full_ts_range: a list, all possible timestamps
+        n_feat: number of features. feature dummies start from 1.
+        seed: random seed
+
+    Return:
+        aug_data: same format as ts_data
+    """
+    N = len(ts_data[0]) # number of data points
+    max_triplet_len = ts_data[1].shape[1]
+    
+    aug_timestamp_array = [[] for _ in range(N)]
+    aug_values_array = [[] for _ in range(N)]
+    aug_feat_dummy_array = [[] for _ in range(N)]
+
+    for n in range(N):
+        for f in range(1,n_feat+1):
+            # for each data point for each feat, do bootstrapping separately.
+            triplet_len = np.sum(ts_data[3][n]==f)
+            if triplet_len <= 5:
+                # if number of observations in one feature dim too small, consider these as noise
+                # an augmentation would be to construct another ts with 
+                # randomly distributed noise (1 - 5 signals) in the full ts range
+                random.seed(random.choice(list(range(100000))))
+                random_time_points = random.choices(full_ts_range,k=random.choice(list(range(0,6,1))))
+                for i in random_time_points:
+                    aug_timestamp_array[n].append(i)
+                    aug_feat_dummy_array[n].append(f) # feat dummy start at 1. 0 means not observed
+                    aug_values_array[n].append(1)
+            else:
+                # bootstrapping
+                random.seed(seed+n*n_feat+f)
+                # a range of the number of data points as the output of bootstrapping, 
+                # e.g. original data have 50 data points, we can bootstrap 45 data points, or 55.
+                btstrp_range = list(range(int(triplet_len*0.7), int(triplet_len*1.3)+2, 1))
+                btstrpd_triplet_idx = random.choices(list(range(triplet_len)),k=random.choice(btstrp_range))
+                for i in btstrpd_triplet_idx:
+                    aug_timestamp_array[n].append(ts_data[1][n][ts_data[3][n]==f][i])
+                    aug_feat_dummy_array[n].append(f)
+                    aug_values_array[n].append(ts_data[2][n][ts_data[3][n]==f][i])
+    
+    # cut each ts at max_triplet_len, then pad with zeros - shape of these arrays (N data points * max_triplet_len)
+    aug_timestamp_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_timestamp_array])
+    aug_values_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_values_array])
+    aug_feat_dummy_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_feat_dummy_array])
+    
+    return [x.astype(float) for x in [ts_data[0], aug_timestamp_array,aug_values_array,aug_feat_dummy_array]]
+
+## generate negative example by randomly sample another user's ts
+def generate_negative_example(ts_data, seed=3):
+    """
+    Generate one negative example by randomly selecting other user's ts from the overall pool
+
+     Args:
+        ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
+                demo shape: N * demo_dim
+                other array shape: N * max_triplet_len
+        seed: random seed
+
+    Return:
+        aug_data: same format as ts_data
+    """
+    # just do a permutation
+    random.seed(seed)
+
+    N = len(ts_data[0]) # number of data points
+    permuted_idx = np.random.permuatation(np.arange(N))
+
+    return [x[permuted_idx] for x in ts_data]
+
+
+def data_augmentation(ts_data, full_ts_range, n_feat, gen_neg=False, seed=3):
+    """
+    Args:
+        ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
+                demo shape: N * demo_dim
+                other array shape: N * max_triplet_len
+        gen_neg: whether to generate negative examples
+    """
+    pos_aug = generate_positive_example(ts_data, full_ts_range, n_feat, seed=seed)
+    if gen_neg:
+        neg_aug = generate_negative_example(ts_data, seed=seed)
+        # duplicate the original and concat, aug - concat pos and neg
+        return [np.vstack(x,x) for x in ts_data], [np.vstack(x,y) for x,y in zip(pos_aug,neg_aug)]
+    
+    return ts_data, pos_aug

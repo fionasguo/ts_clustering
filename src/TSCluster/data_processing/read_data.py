@@ -66,7 +66,7 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     tr_aug_data = [x[:int(tr_frac*len(ts_data[0]))] for x in aug_data]
     te_aug_data = [x[int(tr_frac*len(ts_data[0])):] for x in aug_data]
     # partition ground truth
-    if gt:
+    if gt is not None:
         gt = gt[idx]
         tr_gt = gt[:int(tr_frac*len(ts_data[0]))]
         te_gt = gt[int(tr_frac*len(ts_data[0])):]

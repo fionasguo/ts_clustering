@@ -1,0 +1,31 @@
+Synthetic time series dataset with negative binomial distribution:
+
+1. synthetic_data_X.pkl:
+- simple 3 clusters
+- 2 dimensions
+- everyone in the same cluster respond to the same events (peaks align very well)
+- same num of events and dates across dimensions
+
+2. synthetic_data_simple_3c_2d_X.pkl:
+- simple 3 clusters
+- 2 dimensions
+- everyone in the same cluster respond to the same events
+- num events and dates vary across different dimensions
+
+3. synthetic_data_noisy_3c_2d_X.pkl:
+- 3 clusters
+- 2 dimensions
+- people in the same cluster do NOT respond to the same events
+- num events and dates vary across different dimensions
+
+4. synthetic_data_simple_10c_10d_X.pkl:
+- 10 clusters
+- 10 dimensions
+- people in the same cluster respond to the same events
+- num events and dates vary across different dimensions
+
+5. synthetic_data_noisy_5c_10d_X.pkl:
+- 5 clusters
+- 10 dimensions
+- people in the same cluster DO NOT respond to the same events
+- num events and dates vary across different dimensions

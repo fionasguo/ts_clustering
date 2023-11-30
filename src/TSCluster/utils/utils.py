@@ -73,16 +73,16 @@ def read_config(args):
     # default values
     args['lr'] = 0.0005
     args['batch_size'] = 32
-    args['epoch'] = 1 # 1000
+    args['epoch'] = 5
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
-    args['max_triplet_len'] = 700
-    args['n_feat'] = 21
-    args['demo_dim'] = 0
-    args['dropout'] = 0.2
+    args['max_triplet_len'] = 4000
+    args['n_feat'] = 25
+    args['demo_dim'] = 2
+    args['dropout'] = 0.3
     args['seed'] = 3
     
     # read args in config file

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from sklearn.manifold import TSNE
+import pickle
 
 from .model import SimSiam
 
@@ -52,6 +53,8 @@ def evaluate(data, modelpath, args):
     # compute embeddings
     embeddings = compute_embedding(data1,simsiam,args)
     aug_data_embeddings = compute_embedding(data2,simsiam,args)
+    pickle.dump(embeddings,open(args['output_dir']+'/test_data_embeddings.pkl','wb'))
+    pickle.dump(labels,open(args['output_dir']+'/test_data_labels.pkl','wb'))
 
     # cluster TODO: implement clustering methods
 

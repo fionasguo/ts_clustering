@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import logging
 
 from .data_augmentation import data_augmentation
 
@@ -118,10 +119,14 @@ def read_data(
             raise ValueError('Dimension mismatch between TS and groundtruth data')
 
     # format and combine with demo to input data
+    logging.info('start processing data into triplets')
     data = triplet_formatter(ts_data, max_triplet_len, demo_data)
+    logging.info(f'finished processing data into triplets, len of data={len(data)}, len of demo data={len(data[0])}, shape of ts data={data[1].shape}')
 
     # data augmentation
+    logging.info('start data augmentation')
     data, aug_data = data_augmentation(data, full_ts_range, n_feat, gen_neg=False, seed=seed)
+    logging.info(f'finished data augmentation, len of data={len(aug_data)}, len of demo data={len(aug_data[0])}, shape of ts data={aug_data[1].shape}')
 
     # train val test split
     if data_split == 'tr-val':

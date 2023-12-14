@@ -5,3 +5,5 @@
 *.h5
 *.png
 *.pkl
+build/*
+*tm_*

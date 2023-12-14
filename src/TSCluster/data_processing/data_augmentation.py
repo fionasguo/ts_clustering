@@ -1,8 +1,9 @@
 import random
 import numpy as np
+import math
 
 ## generate positive examples by bootstrapping
-def generate_positive_example(ts_data, full_ts_range, n_feat, seed=3):
+def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, seed=3):
     """
     Generate one positive example using bootstrapping
 
@@ -12,6 +13,7 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, seed=3):
                 other array shape: N * max_triplet_len
         full_ts_range: a list, all possible timestamps
         n_feat: number of features. feature dummies start from 1.
+        noisiness: how much noise to inject into bootstrapping
         seed: random seed
 
     Return:
@@ -43,12 +45,23 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, seed=3):
                 random.seed(seed+n*n_feat+f)
                 # a range of the number of data points as the output of bootstrapping, 
                 # e.g. original data have 50 data points, we can bootstrap 45 data points, or 55.
-                btstrp_range = list(range(int(triplet_len*0.7), int(triplet_len*1.3)+2, 1))
-                btstrpd_triplet_idx = random.choices(list(range(triplet_len)),k=random.choice(btstrp_range))
+                btstrp_count_range = list(range(int(triplet_len*(1-noisiness)), int(triplet_len*(1+noisiness))+2, 1))
+                btstrp_scale_range = list(np.arange((1-noisiness),(1+noisiness),0.05))
+                btstrp_lag_range = [math.ceil(x) for x in list(np.arange(-(noisiness*5),(noisiness*5)+0.5,0.5))]
+                btstrpd_triplet_idx = random.choices(list(range(triplet_len)),k=random.choice(btstrp_count_range))
                 for i in btstrpd_triplet_idx:
-                    aug_timestamp_array[n].append(ts_data[1][n][ts_data[3][n]==f][i])
+                    random.seed(seed+n*n_feat+len(btstrpd_triplet_idx)*f+i)
+                    btstrp_scale = random.choice(btstrp_scale_range)
+                    btstrp_lag = random.choice(btstrp_lag_range)
+                    aug_idx = i + btstrp_lag
+                    if aug_idx >= len(ts_data[1][n][ts_data[3][n]==f]):
+                        aug_idx = len(ts_data[1][n][ts_data[3][n]==f])-1
+                    elif aug_idx < 0:
+                        aug_idx = 0
+
+                    aug_timestamp_array[n].append(ts_data[1][n][ts_data[3][n]==f][aug_idx])
                     aug_feat_dummy_array[n].append(f)
-                    aug_values_array[n].append(ts_data[2][n][ts_data[3][n]==f][i])
+                    aug_values_array[n].append(btstrp_scale*(ts_data[2][n][ts_data[3][n]==f][aug_idx]))
     
     # cut each ts at max_triplet_len, then pad with zeros - shape of these arrays (N data points * max_triplet_len)
     aug_timestamp_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_timestamp_array])
@@ -80,7 +93,7 @@ def generate_negative_example(ts_data, seed=3):
     return [x[permuted_idx] for x in ts_data]
 
 
-def data_augmentation(ts_data, full_ts_range, n_feat, gen_neg=False, seed=3):
+def data_augmentation(ts_data, full_ts_range, n_feat, noisiness=0.3, gen_neg=False, seed=3):
     """
     Args:
         ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
@@ -88,7 +101,7 @@ def data_augmentation(ts_data, full_ts_range, n_feat, gen_neg=False, seed=3):
                 other array shape: N * max_triplet_len
         gen_neg: whether to generate negative examples
     """
-    pos_aug = generate_positive_example(ts_data, full_ts_range, n_feat, seed=seed)
+    pos_aug = generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, seed=seed)
     if gen_neg:
         neg_aug = generate_negative_example(ts_data, seed=seed)
         # duplicate the original and concat, aug - concat pos and neg

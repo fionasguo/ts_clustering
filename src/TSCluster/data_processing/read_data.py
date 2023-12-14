@@ -82,6 +82,7 @@ def read_data(
         demo_data_dir: str = None,
         gt_data_dir: str = None,
         max_triplet_len: int = 200,
+        augmentation_noisiness: float = 0.3,
         data_split: str = 'no',
         tr_frac: float = 0.8,
         seed: int = 3
@@ -92,6 +93,7 @@ def read_data(
         demo_data_dir: a pkl file when unpickled is a 2d np array (N data points * demo_dim)
         gt_data_dir: a pkl file when unpickled is a 1d np array (N data points * 1), the gt label of the clusters
         max_triplet_len: maximum length of triplets for each data point
+        augmentation_noisiness: how much noise to inject into bootstrapping
         tr_te_split: how to perform split 'no', or 'tr-val' or 'tr-val-te'
         tr_frac: fraction of training data
         seed: random seed
@@ -125,7 +127,7 @@ def read_data(
 
     # data augmentation
     logging.info('start data augmentation')
-    data, aug_data = data_augmentation(data, full_ts_range, n_feat, gen_neg=False, seed=seed)
+    data, aug_data = data_augmentation(data, full_ts_range, n_feat, gen_neg=False, noisiness=augmentation_noisiness, seed=seed)
     logging.info(f'finished data augmentation, len of data={len(aug_data)}, len of demo data={len(aug_data[0])}, shape of ts data={aug_data[1].shape}')
 
     # train val test split

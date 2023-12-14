@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 import csv
@@ -54,7 +55,8 @@ if __name__ == '__main__':
     create_logger()
 
     # args
-    mode, args = get_training_args()
+    root_dir = os.path.dirname(os.path.realpath(__file__))
+    mode, args = get_training_args(root_dir)
 
     # set seed
     set_seed(args['seed'])
@@ -67,6 +69,7 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='tr-val'
                 )
         trainer = train(datasets, args)
@@ -77,6 +80,7 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='no'
                 )
         test(datasets,args,trainer)
@@ -87,7 +91,8 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
-                    data_split='tr-val-te'
+                    augmentation_noisiness=args['augmentation_noisiness'],
+                    data_split='no'#'tr-val-te'
                 )
 
         trainer = train(datasets, args)

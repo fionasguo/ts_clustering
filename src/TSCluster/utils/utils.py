@@ -33,24 +33,25 @@ def create_logger():
     logging.getLogger('matplotlib.font_manager').disabled = True
 
 
-def read_command_args(args):
+def read_command_args(args,root_dir):
     """Read arguments from command line."""
 
     parser = argparse.ArgumentParser(description='Unsupervised Time Series Clustering.')
-    parser.add_argument('-m', '--mode', type=str, required=True, help='train,test,or train_test')
-    parser.add_argument( '-c', '--config_dir', type=str, required=False, default=None, help='configuration file dir that specifies hyperparameters etc')
+    parser.add_argument('-m', '--mode', type=str, required=False, default='train_test', help='train,test,or train_test')
+    parser.add_argument('-c', '--config_dir', type=str, required=False, default=None, help='configuration file dir that specifies hyperparameters etc')
     parser.add_argument('-i', '--data_dir', type=str, required=True, help='input data directory')
     parser.add_argument('-d', '--demo_data_dir', type=str, required=False, default=None, help='demographic data directory')
     parser.add_argument('-g', '--gt_dir', type=str, required=False, default=None, help='ground truth label directory')
-    parser.add_argument('-o', '--output_dir', type=str, required=True, help='output directory')
-    parser.add_argument( '-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
+    parser.add_argument('-o', '--output_dir', type=str, required=False, default='./output', help='output directory')
+    parser.add_argument('-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
+    parser.add_argument('-n', '--augmentation_noisiness', type=float, required=False, default=0.3, help='how much noise to inject when performing positive example augmentation for contrastive learning')
     command_args = parser.parse_args()
 
     # mode
     mode = command_args.mode
 
     # data dir
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    # root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     args['ts_data_dir'] = os.path.join(root_dir, command_args.data_dir)
     args['demo_data_dir'] = os.path.join(root_dir, command_args.demo_data_dir) if command_args.demo_data_dir else None
     args['gt_dir'] = os.path.join(root_dir, command_args.gt_dir) if command_args.gt_dir else None
@@ -72,17 +73,19 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 32
+    args['batch_size'] = 64
     args['epoch'] = 5
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
-    args['max_triplet_len'] = 4000
+    args['max_triplet_len'] = 1000
+    args['augmentation_noisiness'] = 0.3
     args['n_feat'] = 25
     args['demo_dim'] = 2
     args['dropout'] = 0.3
+    args['n_cluster'] = 10
     args['seed'] = 3
     
     # read args in config file
@@ -108,9 +111,11 @@ def read_config(args):
         args['n_transformer_layer'] = int(args['n_transformer_layer'])
         args['n_attn_head'] = int(args['n_attn_head'])
         args['max_triplet_len'] = int(args['max_triplet_len'])
+        args['augmentation_noisiness'] = float(args['augmentation_noisiness'])
         args['n_feat'] = int(args['n_feat'])
         args['demo_dim'] = int(args['demo_dim'])
         args['dropout'] = float(args['dropout'])
+        args['n_cluster'] = int(args['n_cluster'])
         args['seed'] = int(args['seed'])
 
     logging.info('Configurations:')
@@ -118,9 +123,9 @@ def read_config(args):
 
     return args
 
-def get_training_args():
+def get_training_args(root_dir):
     args = {}
-    mode, args = read_command_args(args)
+    mode, args = read_command_args(args,root_dir)
     args = read_config(args)
 
     return mode, args

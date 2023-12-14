@@ -5,6 +5,7 @@ from sklearn.manifold import TSNE
 import pickle
 
 from .model import SimSiam
+from .clustering import kmeans_clustering
 
 
 def compute_embedding(data, simsiam, args):
@@ -21,7 +22,7 @@ def plot_tsne(feats, labels, fig_save_path: str):
 
     Can be used to see if source and target domain have distinct features.
     """
-    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=300)
+    tsne = TSNE(n_components=2, verbose=0)
     tsne_results = tsne.fit_transform(feats)
 
     plt.figure(figsize=(8, 8))
@@ -56,9 +57,12 @@ def evaluate(data, modelpath, args):
     pickle.dump(embeddings,open(args['output_dir']+'/test_data_embeddings.pkl','wb'))
     pickle.dump(labels,open(args['output_dir']+'/test_data_labels.pkl','wb'))
 
-    # cluster TODO: implement clustering methods
-
     # plot tsne
     plot_tsne(embeddings,labels,fig_save_path=args['output_dir']+'/org_data_')
     plot_tsne(aug_data_embeddings,labels,fig_save_path=args['output_dir']+'/aug_data_')
 
+    # cluster TODO: compare predicted clusters and ground truth
+    preds = kmeans_clustering(embeddings,args)
+    pickle.dump(preds,open(args['output_dir']+'/test_data_preds.pkl','wb'))
+
+    return preds

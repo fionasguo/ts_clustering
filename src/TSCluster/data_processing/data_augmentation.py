@@ -46,8 +46,11 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, see
                 # a range of the number of data points as the output of bootstrapping, 
                 # e.g. original data have 50 data points, we can bootstrap 45 data points, or 55.
                 btstrp_count_range = list(range(int(triplet_len*(1-noisiness)), int(triplet_len*(1+noisiness))+2, 1))
+                # a range of scale factors for the signals
                 btstrp_scale_range = list(np.arange((1-noisiness),(1+noisiness),0.05))
+                # a range of lag time
                 btstrp_lag_range = [math.ceil(x) for x in list(np.arange(-(noisiness*5),(noisiness*5)+0.5,0.5))]
+                
                 btstrpd_triplet_idx = random.choices(list(range(triplet_len)),k=random.choice(btstrp_count_range))
                 for i in btstrpd_triplet_idx:
                     random.seed(seed+n*n_feat+len(btstrpd_triplet_idx)*f+i)

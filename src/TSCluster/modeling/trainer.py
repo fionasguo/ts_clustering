@@ -38,7 +38,7 @@ class Trainer:
         self.val_X = datasets['val'][0]
         self.val_y = datasets['val'][1]
         # number of data points
-        self.N = len(self.tr_X[0][1])
+        self.N = self.tr_X.__len__
 
         self.args = args
     

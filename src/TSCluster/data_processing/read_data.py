@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 import logging
+import tensorflow as tf
 
 from .data_augmentation import data_augmentation
 
@@ -77,6 +78,29 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     return (tr_data,tr_aug_data), tr_gt, (te_data,te_aug_data), te_gt
 
 
+def create_dataset(data_tuple):
+    """
+    create tf.data.Dataset from np arrays
+    data_tuple: (ts_data,aug_data)
+        ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
+    """
+    ts_data, aug_data = data_tuple
+    ts_data = {
+        'demo':ts_data[0],
+        'timestamps':ts_data[1],
+        'values':ts_data[2],
+        'feat':ts_data[3]
+    }
+    aug_data = {
+        'demo':aug_data[0],
+        'timestamps':aug_data[1],
+        'values':aug_data[2],
+        'feat':aug_data[3]
+    }
+
+    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data))
+
+
 def read_data(
         ts_data_dir: str,
         demo_data_dir: str = None,
@@ -134,14 +158,21 @@ def read_data(
     if data_split == 'tr-val':
         tr_data, tr_gt, val_data, val_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         te_data, te_gt = None, None
+        tr_data = create_dataset(tr_data)
+        val_data = create_dataset(val_data)
         
     elif data_split == 'tr-val-te':
         tr_data, tr_gt, te_data, te_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         tr_data, tr_gt, val_data, val_gt = tr_te_split(tr_data[0],tr_data[1],tr_gt,tr_frac,seed)
+        tr_data = create_dataset(tr_data)
+        val_data = create_dataset(val_data)
+        te_data = create_dataset(te_data)
         
     else:
         tr_data, tr_gt = (data,aug_data), gt
         val_data, val_gt = None, None
         te_data, te_gt = (data,aug_data),gt
+        tr_data = create_dataset(tr_data)
+        te_data = create_dataset(te_data)
 
     return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}

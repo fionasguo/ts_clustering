@@ -75,7 +75,7 @@ def get_encoder(
     emb = Dense(n_feat)(emb) # for forcasting
     # op = Dense(1, activation='sigmoid')(logit_op)
 
-    model = Model([demo, times, values, varis], emb, name = 'encoder')
+    model = Model({'demo':demo, 'timestamps':times, 'values':values, 'feat':varis}, emb, name = 'encoder')
     
     # if forecast:
     #     fore_model = Model([demo, times, values, varis], logit_op)
@@ -137,8 +137,7 @@ class SimSiam(Model):
         return [self.loss_tracker]
 
     def train_step(self, data):
-        # Unpack the data.
-        ds_one, ds_two = data[0]
+        ds_one, ds_two = data
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:

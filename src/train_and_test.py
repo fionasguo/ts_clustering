@@ -37,7 +37,6 @@ def test(data,args,trainer=None):
     else:
         raise ValueError('Please provide a model for evaluation.')
 
-    # TODO: implement evaluation with gt
     evaluate(data, eval_model_path, args)
 
     # # output predictions

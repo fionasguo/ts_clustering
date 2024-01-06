@@ -45,6 +45,7 @@ def read_command_args(args,root_dir):
     parser.add_argument('-o', '--output_dir', type=str, required=False, default='./output', help='output directory')
     parser.add_argument('-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
     parser.add_argument('-n', '--augmentation_noisiness', type=float, required=False, default=0.3, help='how much noise to inject when performing positive example augmentation for contrastive learning')
+    parser.add_argument('-l', '--max_triplet_len', type=int, required=False, default=1000, help='how much noise to inject when performing positive example augmentation for contrastive learning')
     command_args = parser.parse_args()
 
     # mode
@@ -60,6 +61,8 @@ def read_command_args(args,root_dir):
     args['output_dir'] = os.path.join(root_dir, command_args.output_dir)
     if not os.path.exists(os.path.join(root_dir, args['output_dir'])):
         os.makedirs(os.path.join(root_dir, args['output_dir']))
+    args['augmentation_noisiness'] = float(command_args.augmentation_noisiness)
+    args['max_triplet_len'] = int(command_args.max_triplet_len)
         
     return mode, args
 
@@ -73,15 +76,15 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 64
+    args['batch_size'] = 4# 64
     args['epoch'] = 5
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
-    args['max_triplet_len'] = 1000
-    args['augmentation_noisiness'] = 0.3
+    # args['max_triplet_len'] = 1000
+    # args['augmentation_noisiness'] = 0.3
     args['n_feat'] = 25
     args['demo_dim'] = 2
     args['dropout'] = 0.3

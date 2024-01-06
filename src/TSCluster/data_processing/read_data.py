@@ -109,7 +109,6 @@ def read_data(
         augmentation_noisiness: float = 0.3,
         data_split: str = 'no',
         tr_frac: float = 0.8,
-        batch_size: int = 64,
         seed: int = 3
 ):  
     """
@@ -159,21 +158,14 @@ def read_data(
     if data_split == 'tr-val':
         tr_data, tr_gt, val_data, val_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         te_data, te_gt = None, None
-        tr_data = create_dataset(tr_data,batch_size)
-        val_data = create_dataset(val_data,batch_size)
         
     elif data_split == 'tr-val-te':
         tr_data, tr_gt, te_data, te_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         tr_data, tr_gt, val_data, val_gt = tr_te_split(tr_data[0],tr_data[1],tr_gt,tr_frac,seed)
-        tr_data = create_dataset(tr_data,batch_size)
-        val_data = create_dataset(val_data,batch_size)
-        te_data = create_dataset(te_data,batch_size)
         
     else:
         tr_data, tr_gt = (data,aug_data), gt
         val_data, val_gt = None, None
         te_data, te_gt = (data,aug_data),gt
-        tr_data = create_dataset(tr_data,batch_size)
-        te_data = create_dataset(te_data,batch_size)
 
     return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}

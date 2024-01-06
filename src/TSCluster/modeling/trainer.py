@@ -4,6 +4,7 @@ import tensorflow as tf
 
 
 from .model import SimSiam
+from TSCluster import create_dataset
 
 
 # TODO: implement extra callback to check labeled data
@@ -62,6 +63,9 @@ class Trainer:
         simsiam = SimSiam(self.args)
         # self.create_scheduler()
         self.create_callbacks()
+
+        # data
+        self.tr_X = create_dataset(self.tr_X,self.args['batch_size'])
 
         simsiam.compile(optimizer=tf.keras.optimizers.Adam(self.args['lr'])) #(self.lr_decayed_fn))
         history = simsiam.fit(

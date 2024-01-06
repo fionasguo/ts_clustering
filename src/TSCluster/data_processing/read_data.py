@@ -78,7 +78,7 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     return (tr_data,tr_aug_data), tr_gt, (te_data,te_aug_data), te_gt
 
 
-def create_dataset(data_tuple):
+def create_dataset(data_tuple,batch_size):
     """
     create tf.data.Dataset from np arrays
     data_tuple: (ts_data,aug_data)
@@ -98,7 +98,7 @@ def create_dataset(data_tuple):
         'feat':aug_data[3]
     }
 
-    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data))
+    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data)).batch(batch_size)
 
 
 def read_data(
@@ -109,6 +109,7 @@ def read_data(
         augmentation_noisiness: float = 0.3,
         data_split: str = 'no',
         tr_frac: float = 0.8,
+        batch_size: int = 64,
         seed: int = 3
 ):  
     """
@@ -158,21 +159,21 @@ def read_data(
     if data_split == 'tr-val':
         tr_data, tr_gt, val_data, val_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         te_data, te_gt = None, None
-        tr_data = create_dataset(tr_data)
-        val_data = create_dataset(val_data)
+        tr_data = create_dataset(tr_data,batch_size)
+        val_data = create_dataset(val_data,batch_size)
         
     elif data_split == 'tr-val-te':
         tr_data, tr_gt, te_data, te_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
         tr_data, tr_gt, val_data, val_gt = tr_te_split(tr_data[0],tr_data[1],tr_gt,tr_frac,seed)
-        tr_data = create_dataset(tr_data)
-        val_data = create_dataset(val_data)
-        te_data = create_dataset(te_data)
+        tr_data = create_dataset(tr_data,batch_size)
+        val_data = create_dataset(val_data,batch_size)
+        te_data = create_dataset(te_data,batch_size)
         
     else:
         tr_data, tr_gt = (data,aug_data), gt
         val_data, val_gt = None, None
         te_data, te_gt = (data,aug_data),gt
-        tr_data = create_dataset(tr_data)
-        te_data = create_dataset(te_data)
+        tr_data = create_dataset(tr_data,batch_size)
+        te_data = create_dataset(te_data,batch_size)
 
     return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}

@@ -137,6 +137,7 @@ class SimSiam(Model):
         return [self.loss_tracker]
 
     def train_step(self, data):
+        print(data)
         ds_one, ds_two = data
 
         # Forward pass through the encoder and predictor.

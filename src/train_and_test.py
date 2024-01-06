@@ -70,7 +70,8 @@ if __name__ == '__main__':
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
-                    data_split='tr-val'
+                    data_split='tr-val',
+                    batch_size=args['batch_size']
                 )
         trainer = train(datasets, args)
 
@@ -81,7 +82,8 @@ if __name__ == '__main__':
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
-                    data_split='no'
+                    data_split='no',
+                    batch_size=args['batch_size']
                 )
         test(datasets,args,trainer)
 
@@ -92,7 +94,8 @@ if __name__ == '__main__':
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
-                    data_split='no'#'tr-val-te'
+                    data_split='no',#'tr-val-te',
+                    batch_size=args['batch_size']
                 )
 
         trainer = train(datasets, args)

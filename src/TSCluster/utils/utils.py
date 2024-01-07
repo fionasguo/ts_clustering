@@ -76,7 +76,7 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 8 # 64
+    args['batch_size'] = 64
     args['epoch'] = 5
     args['patience'] = 10
     args['weight_decay'] = 0.0005

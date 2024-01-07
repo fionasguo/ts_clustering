@@ -106,8 +106,14 @@ def read_data(
         gt data are 1d np array of length N
     """
     ts_data = pickle.load(open(ts_data_dir,'rb'))
+    if len(ts_data.shape) == 2:
+        # add a dim
+        ts_data = ts_data[:, :, np.newaxis]
+
     N = len(ts_data)
+
     full_ts_range = list(range(ts_data.shape[1]))
+
     n_feat = ts_data.shape[2]
     demo_dim = 1
     

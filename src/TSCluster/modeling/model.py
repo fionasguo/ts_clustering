@@ -72,7 +72,7 @@ def get_encoder(
         # concat to demographic embedding
         emb = Concatenate(axis=-1)([emb, demo_enc])
 
-    emb = Dense(n_feat)(emb) # for forcasting
+    emb = Dense(emb_dim)(emb) # for forcasting
     # op = Dense(1, activation='sigmoid')(logit_op)
 
     model = Model([demo, times, values, varis], emb, name = 'encoder')
@@ -125,7 +125,7 @@ class SimSiam(Model):
             demo_dim=self.args['demo_dim']
         )
         self.predictor = get_predictor(
-            input_dim=self.args['n_feat'], ##TODO: figure out the dim
+            input_dim=self.args['embed_dim'], ##TODO: figure out the dim
             hid_dim=self.args['embed_dim'], 
             weight_decay=self.args['weight_decay']
         )

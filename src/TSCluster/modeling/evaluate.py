@@ -26,8 +26,8 @@ def plot_tsne(feats, labels, fig_save_path: str):
     tsne_results = tsne.fit_transform(feats)
 
     plt.figure(figsize=(8, 8))
-    plt.xlim((-40, 40))
-    plt.ylim((-40, 40))
+    # plt.xlim((-40, 40))
+    # plt.ylim((-40, 40))
     fig = sns.scatterplot(x=tsne_results[:, 0],
                           y=tsne_results[:, 1],
                           hue=labels,

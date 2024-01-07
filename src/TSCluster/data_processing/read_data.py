@@ -79,6 +79,7 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
 
 def read_data(
         ts_data_dir: str,
+        args: dict,
         demo_data_dir: str = None,
         gt_data_dir: str = None,
         max_triplet_len: int = 200,
@@ -90,6 +91,7 @@ def read_data(
     """
     Args:
         ts_data_dir: a pkl file when unpickled is a 3d np array (N data points * ts len * feature dim)
+        args: training args, a dict
         demo_data_dir: a pkl file when unpickled is a 2d np array (N data points * demo_dim)
         gt_data_dir: a pkl file when unpickled is a 1d np array (N data points * 1), the gt label of the clusters
         max_triplet_len: maximum length of triplets for each data point
@@ -107,12 +109,14 @@ def read_data(
     N = len(ts_data)
     full_ts_range = list(range(ts_data.shape[1]))
     n_feat = ts_data.shape[2]
+    demo_dim = 1
     
     demo_data = None
     if demo_data_dir:
         demo_data = pickle.load(open(demo_data_dir,'rb'))
         if len(demo_data) != N:
             raise ValueError('Dimension mismatch between TS and demographic data')
+        demo_dim = demo_data.shape[1]
 
     gt = None
     if gt_data_dir:
@@ -144,4 +148,7 @@ def read_data(
         val_data, val_gt = None, None
         te_data, te_gt = (data,aug_data),gt
 
-    return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}
+    args['n_feat'] = n_feat
+    args['demo_dim'] = demo_dim
+
+    return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}, args

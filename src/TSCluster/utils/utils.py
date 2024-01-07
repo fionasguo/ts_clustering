@@ -76,7 +76,7 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 4# 64
+    args['batch_size'] = 8 # 64
     args['epoch'] = 5
     args['patience'] = 10
     args['weight_decay'] = 0.0005
@@ -85,8 +85,6 @@ def read_config(args):
     args['n_attn_head'] = 4
     # args['max_triplet_len'] = 1000
     # args['augmentation_noisiness'] = 0.3
-    args['n_feat'] = 25
-    args['demo_dim'] = 2
     args['dropout'] = 0.3
     args['n_cluster'] = 10
     args['seed'] = 3
@@ -115,8 +113,6 @@ def read_config(args):
         args['n_attn_head'] = int(args['n_attn_head'])
         args['max_triplet_len'] = int(args['max_triplet_len'])
         args['augmentation_noisiness'] = float(args['augmentation_noisiness'])
-        args['n_feat'] = int(args['n_feat'])
-        args['demo_dim'] = int(args['demo_dim'])
         args['dropout'] = float(args['dropout'])
         args['n_cluster'] = int(args['n_cluster'])
         args['seed'] = int(args['seed'])

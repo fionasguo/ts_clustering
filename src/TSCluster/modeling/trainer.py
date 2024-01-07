@@ -1,3 +1,4 @@
+import os
 import logging
 import numpy as np
 import tensorflow as tf
@@ -39,7 +40,7 @@ class Trainer:
         self.val_X = datasets['val'][0]
         self.val_y = datasets['val'][1]
         # number of data points
-        self.N = self.tr_X.__len__
+        self.N = len(self.tr_X[0][0])
 
         self.args = args
     
@@ -59,22 +60,32 @@ class Trainer:
         self.callbacks = [self.es]
 
     def train(self,savepath=None):
-        # Compile model and start training.
-        simsiam = SimSiam(self.args)
+        strategy = tf.distribute.MirroredStrategy()
+        logging.info("Number of devices: {}".format(strategy.num_replicas_in_sync))
+
         # self.create_scheduler()
         self.create_callbacks()
 
         # data
-        self.tr_X = create_dataset(self.tr_X,self.args['batch_size'])
+        self.tr_X = create_dataset(self.tr_X, self.args['batch_size'])
+        self.tr_X = strategy.experimental_distribute_dataset(self.tr_X)
 
-        simsiam.compile(optimizer=tf.keras.optimizers.Adam(self.args['lr'])) #(self.lr_decayed_fn))
-        history = simsiam.fit(
-            self.tr_X, 
-            batch_size=self.args['batch_size'], 
-            epochs=self.args['epoch'], 
-            # validation_data=(self.val_X),
-            callbacks=self.callbacks
-        )
+        # # checkpoint
+        # checkpoint_dir = args['output_dir']+'/training_checkpoints'
+        # checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+
+        with strategy.scope():
+            # Compile model and start training.
+            simsiam = SimSiam(self.args)
+            simsiam.compile(optimizer=tf.keras.optimizers.Adam(self.args['lr'])) #(self.lr_decayed_fn))
+
+            history = simsiam.fit(
+                self.tr_X, 
+                # batch_size=self.args['batch_size'], 
+                epochs=self.args['epoch'], 
+                # validation_data=(self.val_X),
+                callbacks=self.callbacks
+            )
         if savepath is None: savepath = self.args['output_dir']+'/model_weights.h5'
         simsiam.save_weights(savepath)
 

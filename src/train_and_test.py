@@ -64,8 +64,9 @@ if __name__ == '__main__':
     # train / test
     trainer = None
     if mode == 'train':
-        datasets = read_data(
+        datasets, args = read_data(
                     ts_data_dir=args['ts_data_dir'],
+                    args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
@@ -75,8 +76,9 @@ if __name__ == '__main__':
         trainer = train(datasets, args)
 
     elif mode == 'test':
-        datasets = read_data(
+        datasets, args = read_data(
                     ts_data_dir=args['ts_data_dir'],
+                    args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
@@ -86,8 +88,9 @@ if __name__ == '__main__':
         test(datasets,args,trainer)
 
     elif mode == 'train_test':
-        datasets = read_data(
+        datasets, args = read_data(
                     ts_data_dir=args['ts_data_dir'],
+                    args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],

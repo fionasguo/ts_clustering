@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 
 import tensorflow as tf
@@ -6,7 +7,6 @@ from tensorflow.keras.layers import Embedding, Input, Dense, Lambda, Add, Concat
 from tensorflow.keras import regularizers, Model
 
 from .layers import CVE, Attention, Transformer
-from .loss import compute_siam_loss
 
 
 def get_encoder(
@@ -33,7 +33,7 @@ def get_encoder(
     Return:
         embedding vectors
     """
-    
+    # _emb_dim = emb_dim * 2
 
     # embed feature dummy, or variable name
     varis = Input(shape=(max_triplet_len,))
@@ -45,6 +45,8 @@ def get_encoder(
     cve_units = int(np.sqrt(emb_dim))
     values_emb = CVE(cve_units, emb_dim)(values) # output shape (batch size, max_triplet_len_triplets, d)
     times_emb = CVE(cve_units, emb_dim)(times)
+
+    #TODO: multiply times embedding by a scalar before adding -> control how much of temporal info we want to learn
 
     # combine all embedded vectors
     emb = Add()([varis_emb, values_emb, times_emb]) # (batch size, max_triplet_len_triplets, d)
@@ -72,10 +74,10 @@ def get_encoder(
         # concat to demographic embedding
         emb = Concatenate(axis=-1)([emb, demo_enc])
 
-    emb = Dense(emb_dim)(emb) # for forcasting
+    emb = Dense(emb_dim,name='embed_output')(emb) # for forcasting
     # op = Dense(1, activation='sigmoid')(logit_op)
 
-    model = Model([demo, times, values, varis], emb, name = 'encoder')
+    model = Model({'demo':demo, 'timestamps':times, 'values':values, 'feat':varis}, emb, name = 'encoder')
     
     # if forecast:
     #     fore_model = Model([demo, times, values, varis], logit_op)
@@ -89,21 +91,34 @@ def get_predictor(input_dim, hid_dim, weight_decay):
     Predictor is an AutoEncoder type of structure, 
     input the embedding from encoder, and output to embeddings with same input_dim
     """
-    model = tf.keras.Sequential(
-        [
-            # Note the AutoEncoder-like structure.
-            Input((input_dim,)),
-            Dense(
+    # model = tf.keras.Sequential(
+    #     [
+    #         # Note the AutoEncoder-like structure.
+    #         Input((input_dim,)),
+    #         Dense(
+    #             hid_dim,
+    #             use_bias=False,
+    #             kernel_regularizer=regularizers.l2(weight_decay),
+    #         ),
+    #         ReLU(),
+    #         BatchNormalization(),
+    #         Dense(input_dim),
+    #     ],
+    #     name="predictor",
+    # )
+
+    input_vec = Input((input_dim,))
+    x = Dense(
                 hid_dim,
                 use_bias=False,
                 kernel_regularizer=regularizers.l2(weight_decay),
-            ),
-            ReLU(),
-            BatchNormalization(),
-            Dense(input_dim),
-        ],
-        name="predictor",
-    )
+            )(input_vec)
+    x = ReLU()(x)
+    x = BatchNormalization()(x)
+    x = Dense(input_dim)(x)
+
+    model = Model(input_vec, x, name='predictor')
+
     return model
 
 # To tune:
@@ -130,25 +145,61 @@ class SimSiam(Model):
             weight_decay=self.args['weight_decay']
         )
 
+        self.loss_fn = self.args['loss_fn']
+
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
 
     @property
     def metrics(self):
         return [self.loss_tracker]
 
+    def compute_SimSiam_loss(self, p, z):
+        # The authors of SimSiam emphasize the impact of
+        # the `stop_gradient` operator in the paper as it
+        # has an important role in the overall optimization.
+        z = tf.stop_gradient(z)
+        p = tf.math.l2_normalize(p, axis=1)
+        z = tf.math.l2_normalize(z, axis=1)
+        # Negative cosine similarity (minimizing this is
+        # equivalent to maximizing the similarity).
+        return -tf.reduce_mean(tf.reduce_sum((p * z), axis=1))
+
+    def compute_InfoNCE_loss(self, p1, p2, temperature=0.2):
+        # Negative cosine similarity between positive examples
+        # https://medium.com/geekculture/contrastive-learning-without-negative-pairs-28769bdd8410
+
+        p1 = tf.math.l2_normalize(p1, axis=1) / temperature
+        p2 = tf.math.l2_normalize(p2, axis=1) / temperature
+        loss = tf.reduce_sum((p1 * p2), axis=1) # N
+
+        # Calculate cosine similarity of all original data in the batch
+        cos_sim = tf.linalg.matmul(p1,p2,transpose_b=True)
+        # Mask out cosine similarity to itself
+        mask = tf.eye(cos_sim.shape[0], dtype=tf.dtypes.bool)
+        cos_sim = tf.where(mask, -9e15, cos_sim)
+        
+        # InfoNCE loss
+        loss = -loss + tf.reduce_logsumexp(cos_sim, axis=1)
+        loss = tf.reduce_mean(loss)
+
+        return loss
+
     def train_step(self, data):
         # Unpack the data.
-        ds_one, ds_two = data[0]
+        ds_one, ds_two = data
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:
             z1, z2 = self.encoder(ds_one), self.encoder(ds_two)
             p1, p2 = self.predictor(z1), self.predictor(z2)
 
-            # Note that here we are enforcing the network to match
-            # the representations of two differently augmented batches
-            # of data.
-            loss = compute_siam_loss(p1, z2) / 2 + compute_siam_loss(p2, z1) / 2
+            if self.loss_fn == 'SimSiam':
+                # Note that here we are enforcing the network to match
+                # the representations of two differently augmented batches
+                # of data.
+                loss = self.compute_SimSiam_loss(p1, z2) / 2 + self.compute_SimSiam_loss(p2, z1) / 2
+            elif self.loss_fn == 'InfoNCE':
+                loss = self.compute_InfoNCE_loss(z1,z2,temperature=self.args['temperature'])
 
         # Compute gradients and update the parameters.
         learnable_params = (
@@ -161,3 +212,4 @@ class SimSiam(Model):
         self.loss_tracker.update_state(loss)
 
         return {"loss": self.loss_tracker.result()}
+    

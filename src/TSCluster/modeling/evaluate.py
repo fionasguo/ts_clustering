@@ -24,7 +24,7 @@ def plot_tsne(feats, labels, fig_save_path: str):
     """
     tsne = TSNE(n_components=2, verbose=0)
     tsne_results = tsne.fit_transform(feats)
-
+    
     plt.figure(figsize=(8, 8))
     # plt.xlim((-40, 40))
     # plt.ylim((-40, 40))

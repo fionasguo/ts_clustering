@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 import logging
+import tensorflow as tf
 
 from .data_augmentation import data_augmentation
 
@@ -77,6 +78,37 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     return (tr_data,tr_aug_data), tr_gt, (te_data,te_aug_data), te_gt
 
 
+def create_dataset(data_tuple,batch_size):
+    """
+    create tf.data.Dataset from np arrays
+    data_tuple: (ts_data,aug_data)
+        ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
+    """
+    ts_data, aug_data = data_tuple
+    ts_data = {
+        'demo':ts_data[0],
+        'timestamps':ts_data[1],
+        'values':ts_data[2],
+        'feat':ts_data[3]
+    }
+    aug_data = {
+        'demo':aug_data[0],
+        'timestamps':aug_data[1],
+        'values':aug_data[2],
+        'feat':aug_data[3]
+    }
+
+    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data)).batch(batch_size,drop_remainder=True)
+
+def binarize_gt(gt):
+    biggest_cluster = np.max(gt)
+    mask = gt < biggest_cluster
+
+    binarized_gt = np.zeros(gt.shape)
+    binarized_gt[mask] = 1
+    return binarized_gt
+
+
 def read_data(
         ts_data_dir: str,
         args: dict,
@@ -129,6 +161,11 @@ def read_data(
         gt = pickle.load(open(gt_data_dir,'rb'))
         if len(gt) != N:
             raise ValueError('Dimension mismatch between TS and groundtruth data')
+        if args['binarize_gt']:
+            gt = binarize_gt(gt)
+            args['n_classes'] = 2
+        else:
+            args['n_classes'] = len(np.unique(gt))
 
     # format and combine with demo to input data
     logging.info('start processing data into triplets')

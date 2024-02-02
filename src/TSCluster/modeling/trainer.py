@@ -1,10 +1,10 @@
+import os
 import logging
 import numpy as np
 import tensorflow as tf
 
-
 from .model import SimSiam
-
+from TSCluster import create_dataset
 
 # TODO: implement extra callback to check labeled data
 # class CustomCallback(Callback):
@@ -41,6 +41,8 @@ class Trainer:
         self.N = len(self.tr_X[0][1])
 
         self.args = args
+
+        self.model = SimSiam(self.args)
     
     def create_scheduler(self):
        n_steps = self.args['epoch'] * (self.N // self.args['batch_size'])
@@ -58,21 +60,23 @@ class Trainer:
         self.callbacks = [self.es]
 
     def train(self,savepath=None):
-        # Compile model and start training.
-        simsiam = SimSiam(self.args)
         # self.create_scheduler()
         self.create_callbacks()
 
-        simsiam.compile(optimizer=tf.keras.optimizers.Adam(self.args['lr'])) #(self.lr_decayed_fn))
-        history = simsiam.fit(
+        self.tr_X = create_dataset(self.tr_X, self.args['batch_size'])
+
+        # Compile model and start training.
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(self.args['lr'])) #(self.lr_decayed_fn))
+        
+        history = self.model.fit(
             self.tr_X, 
-            batch_size=self.args['batch_size'], 
+            # batch_size=self.args['batch_size'], 
             epochs=self.args['epoch'], 
             # validation_data=(self.val_X),
             callbacks=self.callbacks
         )
         if savepath is None: savepath = self.args['output_dir']+'/model_weights.h5'
-        simsiam.save_weights(savepath)
+        self.model.save_weights(savepath)
 
-        logging.debug('Negative Cosine Similarity:')
-        logging.debug(history.history['loss'])
+        logging.debug('Finished training SimSiam. Log:')
+        logging.debug(history.history)

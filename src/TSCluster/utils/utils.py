@@ -46,6 +46,9 @@ def read_command_args(args,root_dir):
     parser.add_argument('-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
     parser.add_argument('-n', '--augmentation_noisiness', type=float, required=False, default=0.3, help='how much noise to inject when performing positive example augmentation for contrastive learning')
     parser.add_argument('-l', '--max_triplet_len', type=int, required=False, default=1000, help='how much noise to inject when performing positive example augmentation for contrastive learning')
+    parser.add_argument('--temperature', type=float, required=False, default=0.2, help='temperature scaling')
+    parser.add_argument('--trained_classifier_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained classifier model weight dir')
+    
     command_args = parser.parse_args()
 
     # mode
@@ -63,6 +66,7 @@ def read_command_args(args,root_dir):
         os.makedirs(os.path.join(root_dir, args['output_dir']))
     args['augmentation_noisiness'] = float(command_args.augmentation_noisiness)
     args['max_triplet_len'] = int(command_args.max_triplet_len)
+    args['temperature'] = float(command_args.temperature)
         
     return mode, args
 
@@ -76,17 +80,18 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 64
+    args['batch_size'] = 16
     args['epoch'] = 5
+    args['loss_fn'] = 'InfoNCE' # 'SimSiam'
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
-    # args['max_triplet_len'] = 1000
-    # args['augmentation_noisiness'] = 0.3
-    args['dropout'] = 0.3
+    args['binarize_gt'] = True
+    args['dropout'] = 0.5
     args['n_cluster'] = 10
+    args['tr_frac'] = 0.025
     args['seed'] = 3
     
     # read args in config file
@@ -106,6 +111,7 @@ def read_config(args):
         args['lr'] = float(args['lr'])
         args['batch_size'] = int(args['batch_size'])
         args['epoch'] = int(args['epoch'])
+        args['loss_fn'] = str(args['loss_fn'])
         args['patience'] = int(args['patience'])
         args['weight_decay'] = float(args['weight_decay'])
         args['embed_dim'] = int(args['embed_dim'])
@@ -113,8 +119,10 @@ def read_config(args):
         args['n_attn_head'] = int(args['n_attn_head'])
         args['max_triplet_len'] = int(args['max_triplet_len'])
         args['augmentation_noisiness'] = float(args['augmentation_noisiness'])
+        args['binarize_gt'] = bool(args['binarize_gt'])
         args['dropout'] = float(args['dropout'])
         args['n_cluster'] = int(args['n_cluster'])
+        args['tr_frac'] = float(args['tr_frac'])
         args['seed'] = int(args['seed'])
 
     logging.info('Configurations:')

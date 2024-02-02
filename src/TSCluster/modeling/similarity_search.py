@@ -79,19 +79,28 @@ def plot_network(adjacency_matrix,save_dir):
 
 create_logger()
 
-# embeddings = pickle.load(open('/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/test_data_embeddings.pkl','rb'))
+# embeddings = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/test_data_embeddings.pkl','rb'))
 # embeddings = embeddings.astype('float32')
-# sim_mtx = similarity_search(embeddings,'/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/',metric='cosine')
+# sim_mtx = similarity_search(embeddings,'/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/',metric='cosine')
 
-sim_mtx = pickle.load(open('/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/embedding_similarity_cosine.pkl','rb'))
-sim_mtx[np.triu_indices(len(sim_mtx),k=0)] = -1 # lower triangular mtx
+## spearman r corr between time_coord_gt adjacency matrix and the cosine similarity matrix
+import scipy
+pred_sim_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/embedding_similarity_cosine.pkl','rb'))
+gt_adj_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_time_coord_gt_data_adj_mtx.pkl','rb'))
+spearman_corr = scipy.stats.spearmanr(gt_adj_mtx,pred_sim_mtx,axis=None)
+logging.info(spearman_corr)
 
-all_sim_vals = sim_mtx.flatten()
-all_sim_vals = all_sim_vals[all_sim_vals>-1]
-high_sim_val = np.quantile(all_sim_vals, 0.85)
-logging.info(f"size of all sim values: {len(all_sim_vals)}, 0.9 quantile of simialrity: {high_sim_val}")
 
-adj_mtx = (sim_mtx>high_sim_val).astype(int)
-plot_network(adj_mtx,'/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/')
+## plot network using networkx - doesn't work well
+# sim_mtx = pickle.load(open('/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/embedding_similarity_cosine.pkl','rb'))
+# sim_mtx[np.triu_indices(len(sim_mtx),k=0)] = -1 # lower triangular mtx
 
-logging.info('finished plotting and saving network')
+# all_sim_vals = sim_mtx.flatten()
+# all_sim_vals = all_sim_vals[all_sim_vals>-1]
+# high_sim_val = np.quantile(all_sim_vals, 0.85)
+# logging.info(f"size of all sim values: {len(all_sim_vals)}, 0.9 quantile of simialrity: {high_sim_val}")
+
+# adj_mtx = (sim_mtx>high_sim_val).astype(int)
+# plot_network(adj_mtx,'/nas/home/siyiguo/ts_clustering/test_phase1a_bert_pca_multihighnoise/')
+
+# logging.info('finished plotting and saving network')

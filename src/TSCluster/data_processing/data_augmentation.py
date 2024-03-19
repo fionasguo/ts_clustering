@@ -2,8 +2,21 @@ import random
 import numpy as np
 import math
 
+
+def shuffle_segments(timestamps, feat_dummies, values, full_ts_range, k=4):
+    """
+    randomly select k time points that have 0 or baseline value
+    shuffle these k+1 blocks by shifting timestamps
+    """
+    zero_valued_timestamps = [t for t in full_ts_range if t not in timestamps]
+    # if len(zero_valued_timestamps) < k:
+        # if there's nonbaseline values also works
+
+    return
+
+
 ## generate positive examples by bootstrapping
-def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, seed=3):
+def data_augmentation(ts_data, full_ts_range, n_feat, noisiness=0.3, shuffle_segments=False, seed=3):
     """
     Generate one positive example using bootstrapping
 
@@ -14,6 +27,8 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, see
         full_ts_range: a list, all possible timestamps
         n_feat: number of features. feature dummies start from 1.
         noisiness: how much noise to inject into bootstrapping
+        shuffle_segments: whether to randomly shuffle segments after bootstrapping
+            for cases eg coord campaign, some users only have very high volumn of tweets in a short period of time and zero everywhere else
         seed: random seed
 
     Return:
@@ -42,6 +57,9 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, see
                     aug_values_array[n].append(1)
             else:
                 # bootstrapping
+                tmp_timestamps = []
+                tmp_feat_dummy = []
+                tmp_values = []
                 random.seed(seed+n*n_feat+f)
                 # a range of the number of data points as the output of bootstrapping, 
                 # e.g. original data have 50 data points, we can bootstrap 45 data points, or 55.
@@ -50,7 +68,7 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, see
                 btstrp_scale_range = list(np.arange((1-noisiness),(1+noisiness),0.05))
                 # a range of lag time
                 btstrp_lag_range = [math.ceil(x) for x in list(np.arange(-(noisiness*5),(noisiness*5)+0.5,0.5))]
-                
+                # by bootstrapping, generate indices where there will be data
                 btstrpd_triplet_idx = random.choices(list(range(triplet_len)),k=random.choice(btstrp_count_range))
                 for i in btstrpd_triplet_idx:
                     random.seed(seed+n*n_feat+len(btstrpd_triplet_idx)*f+i)
@@ -62,52 +80,23 @@ def generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, see
                     elif aug_idx < 0:
                         aug_idx = 0
 
-                    aug_timestamp_array[n].append(ts_data[1][n][ts_data[3][n]==f][aug_idx])
-                    aug_feat_dummy_array[n].append(f)
-                    aug_values_array[n].append(btstrp_scale*(ts_data[2][n][ts_data[3][n]==f][aug_idx]))
+                    tmp_timestamps.append(ts_data[1][n][ts_data[3][n]==f][aug_idx])
+                    tmp_feat_dummy.append(f)
+                    tmp_values.append(btstrp_scale*(ts_data[2][n][ts_data[3][n]==f][aug_idx]))
+                
+                # shuffle segments
+                # if shuffle_segments:
+                #     tmp_timestamps, tmp_feat_dummy, tmp_values = shuffle_segments(tmp_timestamps,tmp_feat_dummy,tmp_values,full_ts_range)
+                
+                aug_timestamp_array[n].extend(tmp_timestamps)
+                aug_feat_dummy_array[n].extend(tmp_feat_dummy)
+                aug_values_array[n].extend(tmp_values)
     
     # cut each ts at max_triplet_len, then pad with zeros - shape of these arrays (N data points * max_triplet_len)
     aug_timestamp_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_timestamp_array])
     aug_values_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_values_array])
     aug_feat_dummy_array = np.array([(n+[0]*max_triplet_len)[:max_triplet_len] for n in aug_feat_dummy_array])
     
-    return [x.astype(float) for x in [ts_data[0], aug_timestamp_array,aug_values_array,aug_feat_dummy_array]]
+    aug_data = [x.astype(float) for x in [ts_data[0], aug_timestamp_array,aug_values_array,aug_feat_dummy_array]]
 
-## generate negative example by randomly sample another user's ts
-def generate_negative_example(ts_data, seed=3):
-    """
-    Generate one negative example by randomly selecting other user's ts from the overall pool
-
-     Args:
-        ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
-                demo shape: N * demo_dim
-                other array shape: N * max_triplet_len
-        seed: random seed
-
-    Return:
-        aug_data: same format as ts_data
-    """
-    # just do a permutation
-    random.seed(seed)
-
-    N = len(ts_data[0]) # number of data points
-    permuted_idx = np.random.permuatation(np.arange(N))
-
-    return [x[permuted_idx] for x in ts_data]
-
-
-def data_augmentation(ts_data, full_ts_range, n_feat, noisiness=0.3, gen_neg=False, seed=3):
-    """
-    Args:
-        ts_data: triplet data [demo,timestamp_array,values_array,feat_dummy_array]
-                demo shape: N * demo_dim
-                other array shape: N * max_triplet_len
-        gen_neg: whether to generate negative examples
-    """
-    pos_aug = generate_positive_example(ts_data, full_ts_range, n_feat, noisiness=0.3, seed=seed)
-    if gen_neg:
-        neg_aug = generate_negative_example(ts_data, seed=seed)
-        # duplicate the original and concat, aug - concat pos and neg
-        return [np.vstack(x,x) for x in ts_data], [np.vstack(x,y) for x,y in zip(pos_aug,neg_aug)]
-    
-    return ts_data, pos_aug
+    return ts_data, aug_data

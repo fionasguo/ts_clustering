@@ -50,12 +50,15 @@ def test(data,args,trainer=None):
 
 
 if __name__ == '__main__':
-    # logger
-    create_logger()
-
     # args
     root_dir = os.path.dirname(os.path.realpath(__file__))
     mode, args = get_training_args(root_dir)
+
+    # logger
+    create_logger(args)
+
+    logging.info('Configurations:')
+    logging.info(args)
 
     # set seed
     set_seed(args['seed'])

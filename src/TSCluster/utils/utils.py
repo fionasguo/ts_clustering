@@ -22,11 +22,13 @@ def set_seed(seed):
     tf.config.threading.set_intra_op_parallelism_threads(1)
 
 
-def create_logger():
+def create_logger(args=None):
     try:
         logfilename = os.environ["SLURM_JOB_ID"]
     except:
         logfilename = datetime.now().strftime("%Y%m%d%H%M%S")
+    if args is not None:
+        logfilename = os.path.join(args['output_dir'],logfilename)
     logging.basicConfig(filename=logfilename + '.log',
                         format="%(message)s",
                         level=logging.DEBUG)
@@ -46,9 +48,12 @@ def read_command_args(args,root_dir):
     parser.add_argument('-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
     parser.add_argument('-n', '--augmentation_noisiness', type=float, required=False, default=0.3, help='how much noise to inject when performing positive example augmentation for contrastive learning')
     parser.add_argument('-l', '--max_triplet_len', type=int, required=False, default=1000, help='how much noise to inject when performing positive example augmentation for contrastive learning')
+    parser.add_argument('-s', '--seed', type=int, required=False, default=3, help='random seed')
     parser.add_argument('--temperature', type=float, required=False, default=0.2, help='temperature scaling')
     parser.add_argument('--trained_classifier_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained classifier model weight dir')
-    
+    parser.add_argument('--tau', type=float, required=False, default=1.0, help='controls how much timestamp contributes to the final representation')
+    parser.add_argument('--lam', type=float, required=False, default=1.0, help='controls how much timestamp textual features to the final representation')
+
     command_args = parser.parse_args()
 
     # mode
@@ -61,12 +66,14 @@ def read_command_args(args,root_dir):
     args['gt_dir'] = os.path.join(root_dir, command_args.gt_dir) if command_args.gt_dir else None
     args['config_dir'] = os.path.join(root_dir, command_args.config_dir) if command_args.config_dir else None
     args['trained_model_dir'] = os.path.join(root_dir, command_args.trained_model) if command_args.trained_model else None
+    args['trained_classifier_model_dir'] = os.path.join(root_dir, command_args.trained_classifier_model) if command_args.trained_classifier_model else None
     args['output_dir'] = os.path.join(root_dir, command_args.output_dir)
     if not os.path.exists(os.path.join(root_dir, args['output_dir'])):
         os.makedirs(os.path.join(root_dir, args['output_dir']))
     args['augmentation_noisiness'] = float(command_args.augmentation_noisiness)
     args['max_triplet_len'] = int(command_args.max_triplet_len)
     args['temperature'] = float(command_args.temperature)
+    args['seed'] = int(command_args.seed)
         
     return mode, args
 
@@ -80,19 +87,18 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 16
-    args['epoch'] = 5
-    args['loss_fn'] = 'InfoNCE' # 'SimSiam'
+    args['batch_size'] = 64
+    args['epoch'] = 40
+    args['loss_fn'] = 'InfoNCE' #'SimSiam' #
     args['patience'] = 10
     args['weight_decay'] = 0.0005
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
     args['binarize_gt'] = True
-    args['dropout'] = 0.5
+    args['dropout'] = 0.3
     args['n_cluster'] = 10
-    args['tr_frac'] = 0.025
-    args['seed'] = 3
+    args['tr_frac'] = 0.8
     
     # read args in config file
     if args['config_dir'] is not None:
@@ -124,9 +130,6 @@ def read_config(args):
         args['n_cluster'] = int(args['n_cluster'])
         args['tr_frac'] = float(args['tr_frac'])
         args['seed'] = int(args['seed'])
-
-    logging.info('Configurations:')
-    logging.info(args)
 
     return args
 

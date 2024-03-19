@@ -6,8 +6,8 @@ import re
 import string
 import nltk
 from nltk import word_tokenize
-#nltk.download('punkt')
-#nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('stopwords')
 from nltk.corpus import stopwords
 from emoji import demojize
 

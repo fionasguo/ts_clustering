@@ -96,12 +96,12 @@ logging.info(f'stats of num tweets from active users: mean={active_users.mean()}
 
 ######################## affect features ########################
 # the sum of prob of each feature during 12H period for each user
-user_ts_data = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])[feature_colnames].sum()
-user_ts_data['tweet_count'] = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])['id'].count()
-logging.info(f'raw user affect feature ts data - shape: {user_ts_data.shape}')
-# fill the time series with the entire time range
-user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['twitterAuthorScreenname','timePublished']),fill_value=0)
-logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(active_user_set)}, len of entire time range: {len(entire_time_range)}')
+# user_ts_data = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])[feature_colnames].sum()
+# user_ts_data['tweet_count'] = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])['id'].count()
+# logging.info(f'raw user affect feature ts data - shape: {user_ts_data.shape}')
+# # fill the time series with the entire time range
+# user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['twitterAuthorScreenname','timePublished']),fill_value=0)
+# logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(active_user_set)}, len of entire time range: {len(entire_time_range)}')
 
 # # transform into 3-d np array
 # ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
@@ -111,43 +111,44 @@ logging.info(f'user ts data filled up to entire time range - shape: {user_ts_dat
 
 ######################## BERT embedding features ########################
 # ts data with another set of features - bert embedding - umap reduced
-# logging.info('start computing BERT embeddings')
-# all_embeddings = np.empty((0,768))
-# for i in tqdm(range(len(df)//batch_size+1)):
-#     tmp = df[i*batch_size:(i+1)*batch_size]
-#     encoded_input = tokenizer(tmp['contentText'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
-#     with torch.no_grad():
-#         embeddings = model(**encoded_input).pooler_output
-#     embeddings = embeddings.cpu().numpy()
-#     all_embeddings = np.vstack((all_embeddings,embeddings))
-# logging.info(f'BERT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
-# pickle.dump(all_embeddings,open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings.pkl','wb'))
-# logging.info('BERT embeddings saved.')
+logging.info('start computing BERT embeddings')
+all_embeddings = np.empty((0,768))
+for i in tqdm(range(len(df)//batch_size+1)):
+    tmp = df[i*batch_size:(i+1)*batch_size]
+    encoded_input = tokenizer(tmp['contentText'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
+    with torch.no_grad():
+        embeddings = model(**encoded_input).pooler_output
+    embeddings = embeddings.cpu().numpy()
+    all_embeddings = np.vstack((all_embeddings,embeddings))
+logging.info(f'BERT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
+pickle.dump(all_embeddings,open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings.pkl','wb'))
+logging.info('BERT embeddings saved.')
 # all_embeddings = pickle.load(open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings.pkl','rb'))
 # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
-# # # dim reduction - UMAP - OOM
-# # reducer = umap.UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine',verbose=True)
-# # all_embeddings = reducer.fit_transform(all_embeddings)
-# # logging.info(f'UMAP finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-# # dim reduction - pca
-# logging.info('start PCA')
-# all_embeddings = StandardScaler().fit_transform(all_embeddings)
-# reducer = PCA(n_components=n_comp)
-# all_embeddings = reducer.fit_transform(all_embeddings)
-# logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-# df[list(range(n_comp))] = all_embeddings
-# user_ts_data = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])[list(range(n_comp))].sum()
-# user_ts_data['tweet_count'] = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])['id'].count()
-# logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
-# # fill the time series with the entire time range
-# user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['twitterAuthorScreenname','timePublished']),fill_value=0)
-# logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(active_user_set)}, len of entire time range: {len(entire_time_range)}')
 
-# # transform into 3-d np array
-# ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-# pickle.dump(ts_array, open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings_ts_data.pkl','wb'))
-# logging.info('finished saving BERT embeddings ts data')
+# # dim reduction - UMAP - OOM
+# reducer = umap.UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine',verbose=True)
+# all_embeddings = reducer.fit_transform(all_embeddings)
+# logging.info(f'UMAP finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+# dim reduction - pca
+logging.info('start PCA')
+all_embeddings = StandardScaler().fit_transform(all_embeddings)
+reducer = PCA(n_components=n_comp)
+all_embeddings = reducer.fit_transform(all_embeddings)
+logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+df[list(range(n_comp))] = all_embeddings
+user_ts_data = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])[list(range(n_comp))].sum()
+# user_ts_data['tweet_count'] = df.groupby(['twitterAuthorScreenname',pd.Grouper(freq=agg_time_period,key='timePublished')])['id'].count()
+logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
+# fill the time series with the entire time range
+user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['twitterAuthorScreenname','timePublished']),fill_value=0)
+logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(active_user_set)}, len of entire time range: {len(entire_time_range)}')
+
+# transform into 3-d np array
+ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+pickle.dump(ts_array, open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings_ts_data.pkl','wb'))
+logging.info('finished saving BERT embeddings ts data')
 
 ######################## hashtag features ########################
 # logging.info('start building hashtag features')
@@ -187,7 +188,7 @@ logging.info(f'user ts data filled up to entire time range - shape: {user_ts_dat
 # # build demographic data
 # demo_data = df.groupby(['twitterAuthorScreenname'])[demo_colnames].first()
 # # make sure users are indexed in the same order
-ordered_user_index = user_ts_data.groupby(level=0)['tweet_count'].first().index
+# ordered_user_index = user_ts_data.groupby(level=0)['tweet_count'].first().index
 # demo_data = demo_data.loc[ordered_user_index,].values
 # logging.info(f'demographic data - shape: {demo_data.shape}')
 # pickle.dump(demo_data,open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_demo_data.pkl','wb'))
@@ -261,37 +262,37 @@ ordered_user_index = user_ts_data.groupby(level=0)['tweet_count'].first().index
 # logging.info('finished saving ground truth data')
 
 ######################## ground truth data - retweet_coord ########################
-gt_data_file = '/nas/eclairnas01/users/siyiguo/incas_data/retweet_coord_phase1a.edgelist'
-G = nx.read_edgelist(gt_data_file)
+# gt_data_file = '/nas/eclairnas01/users/siyiguo/incas_data/retweet_coord_phase1a.edgelist'
+# G = nx.read_edgelist(gt_data_file)
 
-df['contentText'] = df['contentText'].str.replace(',','')
-df['contentText'] = df['contentText'].str.replace('.','')
-df['contentText'] = df['contentText'].str.replace(';','')
-df_user = df.groupby('twitterAuthorScreenname')
+# df['contentText'] = df['contentText'].str.replace(',','')
+# df['contentText'] = df['contentText'].str.replace('.','')
+# df['contentText'] = df['contentText'].str.replace(';','')
+# df_user = df.groupby('twitterAuthorScreenname')
 
-gt_data = pd.DataFrame(index=ordered_user_index,columns=['label','hashtags'])
-label = 0
-for c in nx.connected_components(G): # c is a set of user names
-    df_cluster = []
-    for u in c:
-        if u in active_user_set:
-            df_cluster.append(df_user.get_group(u))
-    if len(df_cluster) == 0: continue
-    df_cluster = pd.concat(df_cluster)
-    # df_cluster =pd.concat([df_user.get_group(u) for u in c])
-    hashtags = find_top_hashtags(df_cluster['contentText'],10)
-    gt_data.loc[gt_data.index.isin(c),'label'] = label
-    gt_data.loc[gt_data.index.isin(c),'hashtags'] = gt_data.loc[gt_data.index.isin(c),'hashtags'].apply(lambda x: hashtags)
-    label += 1
-logging.info(f"gt data df shape: {gt_data.shape}, number of clusters: {label+1} (last cluster is unknown), number of users with identified clusters: {gt_data['label'].count()}")
-gt_data['label'] = gt_data['label'].fillna(label)
+# gt_data = pd.DataFrame(index=ordered_user_index,columns=['label','hashtags'])
+# label = 0
+# for c in nx.connected_components(G): # c is a set of user names
+#     df_cluster = []
+#     for u in c:
+#         if u in active_user_set:
+#             df_cluster.append(df_user.get_group(u))
+#     if len(df_cluster) == 0: continue
+#     df_cluster = pd.concat(df_cluster)
+#     # df_cluster =pd.concat([df_user.get_group(u) for u in c])
+#     hashtags = find_top_hashtags(df_cluster['contentText'],10)
+#     gt_data.loc[gt_data.index.isin(c),'label'] = label
+#     gt_data.loc[gt_data.index.isin(c),'hashtags'] = gt_data.loc[gt_data.index.isin(c),'hashtags'].apply(lambda x: hashtags)
+#     label += 1
+# logging.info(f"gt data df shape: {gt_data.shape}, number of clusters: {label+1} (last cluster is unknown), number of users with identified clusters: {gt_data['label'].count()}")
+# gt_data['label'] = gt_data['label'].fillna(label)
 
-# find the top hashtag in tweet
-gt_data['ind_hashtag'] = df.groupby('twitterAuthorScreenname')['contentText'].apply(lambda x: find_top_hashtags(x,5))
+# # find the top hashtag in tweet
+# gt_data['ind_hashtag'] = df.groupby('twitterAuthorScreenname')['contentText'].apply(lambda x: find_top_hashtags(x,5))
 
-pickle.dump(gt_data['label'].values,open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_retweet_coord_gt_data.pkl','wb'))
-gt_data.to_csv('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_retweet_coord_gt_data_df.csv')
-logging.info('finished saving ground truth data')
+# pickle.dump(gt_data['label'].values,open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_retweet_coord_gt_data.pkl','wb'))
+# gt_data.to_csv('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_retweet_coord_gt_data_df.csv')
+# logging.info('finished saving ground truth data')
 
 
 

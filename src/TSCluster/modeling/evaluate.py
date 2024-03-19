@@ -62,7 +62,7 @@ def evaluate(data, modelpath, args):
     plot_tsne(aug_data_embeddings,labels,fig_save_path=args['output_dir']+'/aug_data_')
 
     # cluster TODO: compare predicted clusters and ground truth
-    preds = kmeans_clustering(embeddings,args)
-    pickle.dump(preds,open(args['output_dir']+'/test_data_preds.pkl','wb'))
+    # preds = kmeans_clustering(embeddings,args)
+    # pickle.dump(preds,open(args['output_dir']+'/test_data_preds.pkl','wb'))
 
-    return preds
+    return # preds

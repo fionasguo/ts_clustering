@@ -1,8 +1,9 @@
 import os
 import time
 import logging
-import logging
+import pickle
 import numpy as np
+from sklearn.metrics import classification_report, roc_auc_score
 
 import tensorflow as tf
 from tensorflow.keras import losses, Model
@@ -87,9 +88,16 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     else:
         loss_fn = losses.CategoricalCrossentropy(from_logits=False)
 
-    classifier.compile(loss=loss_fn,
-              optimizer='adam',
-              metrics=tf.keras.metrics.F1Score(average=None,threshold=0.5))
+    classifier.compile(
+        loss=loss_fn,
+        optimizer='adam',
+        metrics=[
+            tf.keras.metrics.Precision(),
+            tf.keras.metrics.Recall(),
+            tf.keras.metrics.F1Score(average=None,threshold=0.5),
+            tf.keras.metrics.AUC()
+            ]
+    )
     
     history = classifier.fit(
         train_dataset,
@@ -109,6 +117,7 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     classifier.summary(print_fn=logging.info)
     embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
     tr_emb = embedding_model.predict(train_dataset.map(lambda X, y: X))
+    pickle.dump(tr_emb,open(args['output_dir']+'/classifier_train_embeddings.pkl','wb'))
     tr_labels = np.asarray(list(train_dataset.map(lambda X,y:y))).flatten()
     val_emb = embedding_model.predict(val_dataset.map(lambda X, y: X))
     val_labels = np.asarray(list(val_dataset.map(lambda X,y:y))).flatten()
@@ -119,37 +128,69 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     return classifier
 
 def test_classifier(test_data, args, classifier):
+    logging.info("Testing Classifier")
     if classifier is None: 
         if args.get('trained_classifier_model_dir') is not None:
             eval_model_path = args['trained_classifier_model_dir']
             classifier = build_classifier(args,simsiam=None)
             classifier.built = True
             classifier.load_weights(eval_model_path)
+
+            if args['n_classes'] == 2:
+                loss_fn = losses.BinaryCrossentropy(from_logits=False)
+            else:
+                loss_fn = losses.CategoricalCrossentropy(from_logits=False)
+
+            classifier.compile(
+                loss=loss_fn,
+                optimizer='adam',
+                metrics=[
+                    tf.keras.metrics.Precision(),
+                    tf.keras.metrics.Recall(),
+                    tf.keras.metrics.F1Score(average=None,threshold=0.5),
+                    tf.keras.metrics.AUC()
+                    ]
+            )
+            logging.info('Classifier loaded')
+            classifier.summary(print_fn=logging.info)
         else:
             raise ValueError('Please provide a model for classification evaluation.')
 
     test_dataset = create_classification_dataset(test_data, args['batch_size'])
 
     eval_results = classifier.evaluate(test_dataset,batch_size=args['batch_size'])
+    test_preds_conf = classifier.predict(test_dataset,batch_size=args['batch_size'])
+    pickle.dump(test_preds_conf,open(args['output_dir']+'/classifier_test_preds_conf.pkl','wb'))
 
     # plot tsne
     embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
     test_emb = embedding_model.predict(test_dataset.map(lambda X, y: X))
+    pickle.dump(test_emb,open(args['output_dir']+'/classifier_test_embeddings.pkl','wb'))
     test_labels = np.asarray(list(test_dataset.map(lambda X,y:y))).flatten()
+    pickle.dump(test_labels,open(args['output_dir']+'/classifier_test_gt_labels.pkl','wb'))
     plot_tsne(test_emb, test_labels, fig_save_path=args['output_dir']+'/classifier_test_data_')
 
-    logging.info(f"Finished evaluating test data.\nLoss: {eval_results[0]}, F1 score:{eval_results[1]}")
+    logging.info(f"Finished evaluating test data.\nLoss: {eval_results[0]}, Precision:{eval_results[1]}, Recall:{eval_results[2]}, F1 score:{eval_results[3]}, AUC-ROC:{eval_results[4]}")
+    
+    test_preds_conf = test_preds_conf.flatten()
+    test_preds = np.zeros(shape=test_preds_conf.shape)
+    test_preds[test_preds_conf>=0.5] = 1
+    logging.info(f"manual - AUC={roc_auc_score(test_labels,test_preds)}")
+    logging.info(classification_report(test_labels,test_preds))
 
     return eval_results
 
 
 if __name__ == '__main__':
-    # logger
-    create_logger()
-
     # args
     root_dir = os.path.dirname(os.path.realpath(__file__))
     mode, args = get_training_args(root_dir)
+
+    # logger
+    create_logger(args)
+
+    logging.info('Configurations:')
+    logging.info(args)
 
     # set seed
     set_seed(args['seed'])
@@ -168,6 +209,7 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='tr-val',
                     tr_frac=args['tr_frac']
@@ -184,6 +226,7 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='no',
                     tr_frac=args['tr_frac']
@@ -197,6 +240,7 @@ if __name__ == '__main__':
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='tr-val-te',
                     tr_frac=args['tr_frac']

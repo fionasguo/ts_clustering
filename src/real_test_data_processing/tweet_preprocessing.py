@@ -6,8 +6,8 @@ import re
 import string
 import nltk
 from nltk import word_tokenize
-nltk.download('punkt')
-nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('stopwords')
 from nltk.corpus import stopwords
 from emoji import demojize
 
@@ -70,8 +70,8 @@ def preprocess_tweet(tweet):
     """
     preprocess one string (tweet):
     1. remove URLs
-    2. replace all mentions with "@user"
-    3. remove or split hashtags
+    2. replace all mentions with "@user" X
+    3. remove or split hashtags X
     4. emojis to description
     5. to lower case
     6. remove punctuations
@@ -79,34 +79,30 @@ def preprocess_tweet(tweet):
     8. remove emoticons
 
     """
-    try:
-        # remove URLs
-        tweet = re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))',
-                    '', tweet)
-        # tweet = re.sub(r'http\S+', '', tweet)
-        # remove usernames
-        # tweet = re.sub('@[^\s]+', '', tweet)
-        # remove amp
-        #tweet = re.sub('amp', '', tweet)
-        # remove the # in hashtag and split hashtags
-        # tweet = split_hashtag(tweet)
-        # remove hashtags
-        # tweet = re.sub('#[^\s]+', '', tweet)
-        # emojis to description
-        # tweet = demojize(tweet)
-        # remove emojis
-        tweet = remove_emojis(tweet)
-        # convert text to lower-case
-        tweet = tweet.lower()
-        # remove any other punctuation
-        tweet = ''.join([char for char in tweet if char not in PUNCT])
-        # remove non-ascii characters
-        tweet = re.sub(r'[^a-zA-Z]+', ' ', tweet)
-        # remove stopwords and emoticons from final word list
-        # stop_words = set(stopwords.words('english'))
-        tweet = ' '.join([w for w in word_tokenize(tweet) if (w not in EMOTICONS and len(w)<15)][:200])
-    except:
-        return ""
+    # remove URLs
+    tweet = re.sub('((www\.[^\s]+)|(https?://[^\s]+)|(http?://[^\s]+))',
+                   'http', tweet)
+    tweet = re.sub(r'http\S+', 'http', tweet)
+    # remove usernames
+    # tweet = re.sub('@[^\s]+', '@user', tweet)
+    # remove the # in hashtag and split hashtags
+    # tweet = split_hashtag(tweet)
+    # remove hashtags
+    # tweet = re.sub('#[^\s]+', '', tweet)
+    # emojis to description
+    # tweet = demojize(tweet)
+    # remove emojis
+    tweet = remove_emojis(tweet)
+    # convert text to lower-case
+    tweet = tweet.lower()
+    #Remove any other punctuation
+    tweet = ''.join([char for char in tweet if char not in PUNCT])
+    #Remove non-ascii characters
+    tweet = re.sub(r'[^\x00-\x7F]+', '', tweet)
+    #Remove stopwords and emoticons from final word list
+    stop_words = set(stopwords.words('english'))
+    tweet = ' '.join([w for w in word_tokenize(tweet) if (w not in EMOTICONS) and (w not in stop_words)])
+
     return tweet
 
 

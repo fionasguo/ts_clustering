@@ -3,10 +3,12 @@ from datetime import datetime
 import logging
 import pickle
 import numpy as np
+import random
 import math
 import faiss
 import networkx as nx
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 
 def create_logger():
@@ -42,11 +44,12 @@ def similarity_search(embeddings,save_dir,metric='euclidean'):
     index.add(embeddings)
     logging.info('finished index train and add')
 
-    logging.info('start computing distances')
+    logging.info(f'start computing distances, N={N}')
     all_distances = np.empty((N,0),dtype='float32')
+
     n_blocks = 4
     k = math.ceil(N/n_blocks)
-    for i in range(n_blocks):
+    for i in tqdm(range(n_blocks)):
         k_i = N - k*(n_blocks-1) if i == n_blocks-1 else k
         distances = np.empty((N,k_i),dtype='float32')
         labels = np.array([list(range(i*k,(i*k+k_i))) for _ in range(N)],dtype='int64')
@@ -79,16 +82,25 @@ def plot_network(adjacency_matrix,save_dir):
 
 create_logger()
 
-# embeddings = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/test_data_embeddings.pkl','rb'))
-# embeddings = embeddings.astype('float32')
-# sim_mtx = similarity_search(embeddings,'/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/',metric='cosine')
+data_dir = '/nas/eclairnas01/users/siyiguo/ts_clustering/test_rvw_autonomy_health/0624_1108_cla/'
+logging.info(data_dir)
 
-## spearman r corr between time_coord_gt adjacency matrix and the cosine similarity matrix
-import scipy
-pred_sim_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_phase1a_bert_pca_lownoise_InfoNCE_temp5/embedding_similarity_cosine.pkl','rb'))
-gt_adj_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_time_coord_gt_data_adj_mtx.pkl','rb'))
-spearman_corr = scipy.stats.spearmanr(gt_adj_mtx,pred_sim_mtx,axis=None)
-logging.info(spearman_corr)
+# rows_id = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_rvw_3D_demo/autonomy_health_0101_0502_cla/classifier_test_embeddings_random_row_idx.pkl','rb'))
+embeddings = pickle.load(open(data_dir+'classifier_test_embeddings.pkl','rb'))
+embeddings = embeddings.astype('float32')
+# rows_id = random.sample(range(embeddings.shape[0]), int(0.6*embeddings.shape[0]))
+# logging.info(f"total N={embeddings.shape[0]} randomly sample {len(rows_id)} rows")
+# pickle.dump(rows_id,open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_rvw_3D_demo/autonomy_health_0101_0502_cla/classifier_test_embeddings_random_row_idx.pkl','wb'))
+# embeddings = embeddings[rows_id,:]
+
+sim_mtx = similarity_search(embeddings,data_dir,metric='euclidean')
+
+# ## spearman r corr between time_coord_gt adjacency matrix and the cosine similarity matrix
+# import scipy
+# pred_sim_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/ts_clustering/test_rvw_3D_demo/0101_0502_cla/classifier_test_embeddings.pkl','rb'))
+# gt_adj_mtx = pickle.load(open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_time_coord_gt_data_adj_mtx.pkl','rb'))
+# spearman_corr = scipy.stats.spearmanr(gt_adj_mtx,pred_sim_mtx,axis=None)
+# logging.info(spearman_corr)
 
 
 ## plot network using networkx - doesn't work well

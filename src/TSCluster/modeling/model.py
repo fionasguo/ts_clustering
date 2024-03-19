@@ -16,7 +16,9 @@ def get_encoder(
         n_transformer_layer: int = 2, 
         n_attn_head: int = 4, 
         dropout: float = 0.2, 
-        demo_dim=0
+        demo_dim: int = 0,
+        tau: float = 1.0,
+        lam: float = 1.0
     ):
     """
     The encoder that embed time series triplets into a vector.
@@ -29,6 +31,8 @@ def get_encoder(
         n_attn_head: number of transformer attention heads
         dropout: dropout rate
         demo_dim: dim of demographic vector if zero means we don't have it
+        tau: scalar that the timestamp embedding is multiplied with, controls how much timestamp contributes to the final representation
+        lam: scalar that the feat and value embedding is multiplied with, controls how much features and values contributes to the final representation
 
     Return:
         embedding vectors
@@ -37,7 +41,7 @@ def get_encoder(
 
     # embed feature dummy, or variable name
     varis = Input(shape=(max_triplet_len,))
-    varis_emb = Embedding(n_feat+1, emb_dim)(varis) # output shape (batch size, max_triplet_len_triplets, d)
+    varis_emb = Embedding(n_feat, emb_dim)(varis) # output shape (batch size, max_triplet_len_triplets, d) # n_feat + 1 for unknown - not needed
 
     # embed timestamps and values
     values = Input(shape=(max_triplet_len,))
@@ -46,7 +50,10 @@ def get_encoder(
     values_emb = CVE(cve_units, emb_dim)(values) # output shape (batch size, max_triplet_len_triplets, d)
     times_emb = CVE(cve_units, emb_dim)(times)
 
-    #TODO: multiply times embedding by a scalar before adding -> control how much of temporal info we want to learn
+    # multiply times embedding by a scalar before adding -> control how much of temporal info we want to learn
+    times_emb = Lambda(lambda x: x * tau)(times_emb)
+    varis_emb = Lambda(lambda x: x * lam)(varis_emb)
+    values_emb = Lambda(lambda x: x * lam)(values_emb)
 
     # combine all embedded vectors
     emb = Add()([varis_emb, values_emb, times_emb]) # (batch size, max_triplet_len_triplets, d)
@@ -137,7 +144,9 @@ class SimSiam(Model):
             n_transformer_layer=self.args['n_transformer_layer'], 
             n_attn_head=self.args['n_attn_head'], 
             dropout=self.args['dropout'], 
-            demo_dim=self.args['demo_dim']
+            demo_dim=self.args['demo_dim'],
+            tau=self.args['tau'],
+            lam=self.args['lam']
         )
         self.predictor = get_predictor(
             input_dim=self.args['embed_dim'], ##TODO: figure out the dim
@@ -187,6 +196,8 @@ class SimSiam(Model):
     def train_step(self, data):
         # Unpack the data.
         ds_one, ds_two = data
+        print(ds_one)
+        print(ds_two)
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:
@@ -199,7 +210,7 @@ class SimSiam(Model):
                 # of data.
                 loss = self.compute_SimSiam_loss(p1, z2) / 2 + self.compute_SimSiam_loss(p2, z1) / 2
             elif self.loss_fn == 'InfoNCE':
-                loss = self.compute_InfoNCE_loss(z1,z2,temperature=self.args['temperature'])
+                loss = self.compute_InfoNCE_loss(p1,p2,temperature=self.args['temperature'])
 
         # Compute gradients and update the parameters.
         learnable_params = (

@@ -7,3 +7,4 @@
 *.pkl
 build/*
 *tm_*
+*.egg-info

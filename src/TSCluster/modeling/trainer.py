@@ -54,9 +54,7 @@ class Trainer:
         self.es = tf.keras.callbacks.EarlyStopping(
                 monitor="loss", patience=self.args['patience'], restore_best_weights=True
             )
-        # TODO: implement evaluation with labels
-        # if self.val_y is not None:
-        #     self. = 
+        
         self.callbacks = [self.es]
 
     def train(self,savepath=None):

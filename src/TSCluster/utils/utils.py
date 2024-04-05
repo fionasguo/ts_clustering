@@ -74,6 +74,8 @@ def read_command_args(args,root_dir):
     args['max_triplet_len'] = int(command_args.max_triplet_len)
     args['temperature'] = float(command_args.temperature)
     args['seed'] = int(command_args.seed)
+    args['tau'] = float(command_args.tau)
+    args['lam'] = float(command_args.lam)
         
     return mode, args
 
@@ -87,7 +89,7 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 64
+    args['batch_size'] = 32
     args['epoch'] = 40
     args['loss_fn'] = 'InfoNCE' #'SimSiam' #
     args['patience'] = 10
@@ -95,7 +97,7 @@ def read_config(args):
     args['embed_dim'] = 50
     args['n_transformer_layer'] = 2
     args['n_attn_head'] = 4
-    args['binarize_gt'] = True
+    args['binarize_gt'] = False
     args['dropout'] = 0.3
     args['n_cluster'] = 10
     args['tr_frac'] = 0.8

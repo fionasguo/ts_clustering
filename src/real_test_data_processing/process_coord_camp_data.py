@@ -152,16 +152,16 @@ china: '2014-07-24' to '2019-07-24' 3D
 """
 
 
-start_date = '2014-07-24' #'2009-07-06'
-end_date = '2019-07-24'
+start_date = '2015-12-19' #'2009-07-06'
+end_date = '2020-12-19'
 agg_time_period='3D'
 entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period,tz='utc')
 
-data_dir = '/nas/eclairnas01/users/siyiguo/InfoOpsNationwiseDriverControl/china/'
+data_dir = '/nas/eclairnas01/users/siyiguo/InfoOpsNationwiseDriverControl/russia/'
 
 df = pd.read_csv(data_dir+'all_controls_drivers.csv',lineterminator='\n')
 
-df['tweet_time'] = pd.to_datetime(df['tweet_time'],utc=True,format='mixed')
+df['tweet_time'] = pd.to_datetime(df['tweet_time'],utc=True,format='mixed') #
 logging.info(f"min date:{df['tweet_time'].min()}, max date:{df['tweet_time'].max()}")
 logging.info(f"languages:\n{df['tweet_language'].value_counts()}")
 
@@ -238,17 +238,17 @@ logging.info('\n\n')
 # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
 # logging.info('PCA saved')
 
-all_embeddings = np.empty((0,5))
-pca_files =  glob(data_dir+'xlmt_embeddings_*_pca.pkl')
-for f in pca_files:
-    all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
+# all_embeddings = np.empty((0,5))
+# pca_files =  glob(data_dir+'xlmt_embeddings_*_pca.pkl')
+# for f in pca_files:
+#     all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
 
-logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
-logging.info("PCA embeddings saved.")
+# logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+# pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
+# logging.info("PCA embeddings saved.")
 
-# all_embeddings = pickle.load(open(data_dir+'xlmt_embeddings_pca.pkl','rb'))
-# logging.info("PCA embeddings loaded.")
+all_embeddings = pickle.load(open(data_dir+'xlmt_embeddings_pca.pkl','rb'))
+logging.info("PCA embeddings loaded.")
 
 df[list(range(n_comp))] = all_embeddings
 
@@ -256,7 +256,7 @@ df = df[(df['tweet_time']>=pd.Timestamp(start_date,tz='utc')) & (df['tweet_time'
 logging.info(f"data '2014-07-24' to '2019-07-24' 3D: shape={df.shape}")
 
 user_ts_data = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])[list(range(n_comp))].sum()
-# user_ts_data['tweet_count'] = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])['tweetid'].count()
+user_ts_data['tweet_count'] = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])['tweetid'].count()
 logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
 # fill the time series with the entire time range
 user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['userid','tweet_time']),fill_value=0)
@@ -265,54 +265,54 @@ logging.info(f'user ts data filled up to entire time range - shape: {user_ts_dat
 # transform into 3-d np array
 ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
 logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array, open(data_dir+'xlmt_embeddings_ts_data.pkl','wb'))
-logging.info('finished saving BERT embeddings ts data')
+pickle.dump(ts_array[:,:,-1], open(data_dir+'activity_ts_data.pkl','wb'))
+logging.info('finished saving activity ts data')
 
 # keep record to make sure users are indexed in the same order
 ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
 
 
-######################## demographic data ########################
-def fn1(x):
-    modes = list(x.mode())
-    if len(modes) > 1:
-        return 'und'
-    else:
-        return modes[0]
+# ######################## demographic data ########################
+# def fn1(x):
+#     modes = list(x.mode())
+#     if len(modes) > 1:
+#         return 'und'
+#     else:
+#         return modes[0]
 
-demo_colnames = ['follower_count', 'following_count']
-# build demographic data
-demo_data = df.groupby(['userid'])[demo_colnames].first()
-# # process language as lookup table
-# logging.info(f"processing language categories to int: total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
-# tmp = pd.Categorical(demo_data['account_language'])
-# demo_data['account_language'] = tmp.codes
-# demo_data.loc[demo_data['account_language']==-1,'account_language'] = 3
-# tmp = df.groupby(['userid'])['tweet_language'].apply(fn1)
-# tmp = pd.Categorical(tmp)
-# demo_data['tweet_language'] = tmp.codes
-# logging.info(f"users' most freq tweet lanuguage {tmp.categories}")
-# logging.info(f"after lang to code:  total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
-# save
-demo_data = demo_data.loc[ordered_user_index,].values
-logging.info(f'demographic data - shape: {demo_data.shape}')
-pickle.dump(demo_data,open(data_dir+'demo_data.pkl','wb'))
+# demo_colnames = ['follower_count', 'following_count']
+# # build demographic data
+# demo_data = df.groupby(['userid'])[demo_colnames].first()
+# # # process language as lookup table
+# # logging.info(f"processing language categories to int: total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
+# # tmp = pd.Categorical(demo_data['account_language'])
+# # demo_data['account_language'] = tmp.codes
+# # demo_data.loc[demo_data['account_language']==-1,'account_language'] = 3
+# # tmp = df.groupby(['userid'])['tweet_language'].apply(fn1)
+# # tmp = pd.Categorical(tmp)
+# # demo_data['tweet_language'] = tmp.codes
+# # logging.info(f"users' most freq tweet lanuguage {tmp.categories}")
+# # logging.info(f"after lang to code:  total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
+# # save
+# demo_data = demo_data.loc[ordered_user_index,].values
+# logging.info(f'demographic data - shape: {demo_data.shape}')
+# pickle.dump(demo_data,open(data_dir+'demo_data.pkl','wb'))
 
-"""
-target_cols = ['tweetid', 'userid', 'user_screen_name',
-#        'user_reported_location', 'user_profile_description',
-#        'follower_count', 'following_count','tweet_language',
-#        'tweet_text', 'tweet_time', 'label']
-"""
-######################## ground truth data ########################
-def fn2(x):
-    modes = list(x.mode())
-    if len(modes) > 1:
-        return 1
-    else:
-        return modes[0]
+# """
+# target_cols = ['tweetid', 'userid', 'user_screen_name',
+# #        'user_reported_location', 'user_profile_description',
+# #        'follower_count', 'following_count','tweet_language',
+# #        'tweet_text', 'tweet_time', 'label']
+# """
+# ######################## ground truth data ########################
+# def fn2(x):
+#     modes = list(x.mode())
+#     if len(modes) > 1:
+#         return 1
+#     else:
+#         return modes[0]
     
-gt_data = df.groupby('userid')['label'].apply(fn2)
-gt_data = gt_data.loc[ordered_user_index,].values
-logging.info(f'groundtruth data - shape: {gt_data.shape}, # coord={gt_data.sum()}')
-pickle.dump(gt_data,open(data_dir+'/gt_data.pkl','wb'))
+# gt_data = df.groupby('userid')['label'].apply(fn2)
+# gt_data = gt_data.loc[ordered_user_index,].values
+# logging.info(f'groundtruth data - shape: {gt_data.shape}, # coord={gt_data.sum()}')
+# pickle.dump(gt_data,open(data_dir+'/gt_data.pkl','wb'))

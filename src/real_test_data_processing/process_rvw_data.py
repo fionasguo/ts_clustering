@@ -45,6 +45,11 @@ model = AutoModel.from_pretrained(MODEL).to(device)
 
 n_comp = 5
 
+feat_cols = ['care', 'harm', 'fairness',
+       'cheating', 'loyalty', 'betrayal', 'authority', 'subversion', 'purity',
+       'degradation', 'anger', 'anticipation', 'disgust', 'fear', 'joy',
+       'love', 'optimism', 'pessimism', 'sadness', 'surprise', 'trust']
+
 # data_dir = '/nas/eclairnas01/users/siyiguo/rvw_data/rvw_us_en_data_mf_emot.pkl'
 # df = pickle.load(open(data_dir,'rb'))
 # logging.info(f"data loaded. size: {df.shape}, columns:\n{df.columns}")
@@ -154,26 +159,35 @@ logging.info(f"0.5 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0
 all_embeddings = pickle.load(open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_pca.pkl','rb'))
 df[list(range(n_comp))] = all_embeddings
 
-user_ts_data = df.groupby(['author.username',pd.Grouper(freq=agg_time_period,key='created_at')])[list(range(n_comp))].sum()
+user_ts_data = df.groupby(['author.username',pd.Grouper(freq=agg_time_period,key='created_at')])[list(range(n_comp))+feat_cols].sum()
+user_ts_data['tweet_count'] = df.groupby(['author.username',pd.Grouper(freq=agg_time_period,key='created_at')])['id'].count()
 logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
 # fill the time series with the entire time range
 user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author.username','created_at']),fill_value=0)
 logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(pd.unique(user_ts_data.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data.index.get_level_values(level=1)))}')
 
-# select only a period of time
-user_ts_data = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-01-01',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-05-02',tz='utc'))]
-logging.info(f'user ts data in selected time range 2022-01-01 to 2022-05-02 - shape: {user_ts_data.shape}; number of users: {len(pd.unique(user_ts_data.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data.index.get_level_values(level=1)))}')
-
 # transform into 3-d np array
 ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
 logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array, open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_ts_data_0101_0502_3D.pkl','wb'))
+pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_3D.pkl','wb'))
 logging.info('finished saving BERT embeddings ts data')
 
 # keep record to make sure users are indexed in the same order
 ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
 logging.info(f"ordered_user_index:\n{list(ordered_user_index)[:10]}")
 
+# select only a period of time
+user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-01-01',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-05-02',tz='utc'))]
+logging.info(f'user ts data in selected time range 2022-01-01 to 2022-05-02 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
+ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0101_0502_3D.pkl','wb'))
+
+user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-06-24',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-11-08',tz='utc'))]
+logging.info(f'user ts data in selected time range 2022-06-24 to 2022-11-08 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
+ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0624_1108_3D.pkl','wb'))
 
 ####################### demographic data ########################
 # demo_cols = ['author.public_metrics.followers_count','author.public_metrics.following_count','author.public_metrics.tweet_count']

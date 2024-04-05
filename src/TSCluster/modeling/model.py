@@ -149,7 +149,7 @@ class SimSiam(Model):
             lam=self.args['lam']
         )
         self.predictor = get_predictor(
-            input_dim=self.args['embed_dim'], ##TODO: figure out the dim
+            input_dim=self.args['embed_dim'],
             hid_dim=self.args['embed_dim'], 
             weight_decay=self.args['weight_decay']
         )
@@ -211,6 +211,8 @@ class SimSiam(Model):
                 loss = self.compute_SimSiam_loss(p1, z2) / 2 + self.compute_SimSiam_loss(p2, z1) / 2
             elif self.loss_fn == 'InfoNCE':
                 loss = self.compute_InfoNCE_loss(p1,p2,temperature=self.args['temperature'])
+            # # TODO: add link prediction loss
+            # 
 
         # Compute gradients and update the parameters.
         learnable_params = (

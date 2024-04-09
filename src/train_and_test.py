@@ -71,6 +71,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='tr-val'
@@ -83,6 +84,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='no'
@@ -95,6 +97,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='no'#'tr-val-te'

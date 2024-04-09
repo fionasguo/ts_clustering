@@ -33,12 +33,12 @@ class Trainer:
         args: dict of parameters
     """
     def __init__(self,datasets,args):
-        self.tr_X = datasets['train'][0] # pair (tr_data, aug_data)
-        self.tr_y = datasets['train'][1] # could be None
-        self.val_X = datasets['val'][0]
-        self.val_y = datasets['val'][1]
+        self.tr_X = datasets['train'][:2] # pair ((tr_data, aug_data),(indices,links))
+        self.tr_y = datasets['train'][2] # could be None
+        self.val_X = datasets['val'][:2]
+        self.val_y = datasets['val'][2]
         # number of data points
-        self.N = len(self.tr_X[0][1])
+        self.N = len(self.tr_X[0][0][1])
 
         self.args = args
 

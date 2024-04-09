@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from itertools import combinations
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
@@ -128,9 +129,51 @@ def get_predictor(input_dim, hid_dim, weight_decay):
 
     return model
 
-# To tune:
-# 1. Transformer parameters. (N, h, dropout)
-# 2. Normalization
+def get_link_predictor(input_dim, hid_dim, weight_decay):
+    emb1 = Input((input_dim,))
+    emb2 = Input((input_dim,))
+    x = Concatenate(axis=-1)([emb1, emb2])
+
+    x = Dense(
+                hid_dim,
+                use_bias=False,
+                kernel_regularizer=regularizers.l2(weight_decay),
+            )(x)
+    x = ReLU()(x)
+    x = BatchNormalization()(x)
+    x = Dense(1,activation='sigmoid')(x)
+
+    model = Model((emb1,emb2), x, name='link_predictor')
+    return model
+
+def make_combinations(array,batch_size):
+    size = tf.shape(array)[0]
+    # Make 2D grid of indices
+    r = tf.range(size)
+    ii, jj = tf.meshgrid(r, r, indexing='ij')
+    # Take pairs of indices where the first is less or equal than the second
+    m = ii < jj
+    m.set_shape([batch_size,batch_size])
+    output_size = int((batch_size-1)/2*batch_size)
+    return tf.gather(array, tf.reshape(tf.boolean_mask(ii, m),[output_size])),tf.gather(array,tf.reshape(tf.boolean_mask(jj, m),[output_size]))
+
+def prepare_link_data(emb,indices,links,batch_size):
+    """
+    make pair combinations of all rows in emb, and label them with 1 if there's a link exists between them
+
+    emb: tensor batch_size * hidden_dim
+    indices: the index of each emb, (batch_size,)
+    links: for each emb, the indicies of other embs that have a link with, batch_sizw * max # links (padded with -1)
+    """
+    emb1, emb2 = make_combinations(emb,batch_size)
+    idx, tgt_idx = make_combinations(indices,batch_size)
+    idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
+    expanded_links = tf.gather(links,indices=idx_to_links)
+    y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
+
+    return emb1,emb2,y_link
+    
+
 
 class SimSiam(Model):
     def __init__(self, args):
@@ -149,6 +192,11 @@ class SimSiam(Model):
             lam=self.args['lam']
         )
         self.predictor = get_predictor(
+            input_dim=self.args['embed_dim'],
+            hid_dim=self.args['embed_dim'], 
+            weight_decay=self.args['weight_decay']
+        )
+        self.link_predictor = get_link_predictor(
             input_dim=self.args['embed_dim'],
             hid_dim=self.args['embed_dim'], 
             weight_decay=self.args['weight_decay']
@@ -194,10 +242,12 @@ class SimSiam(Model):
         return loss
 
     def train_step(self, data):
-        # Unpack the data.
-        ds_one, ds_two = data
+        # Unpack the data - (ts_data,link_data)
+        ds_one, ds_two, indices, links = data
         print(ds_one)
         print(ds_two)
+        print(indices)
+        print(links)
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:
@@ -211,13 +261,24 @@ class SimSiam(Model):
                 loss = self.compute_SimSiam_loss(p1, z2) / 2 + self.compute_SimSiam_loss(p2, z1) / 2
             elif self.loss_fn == 'InfoNCE':
                 loss = self.compute_InfoNCE_loss(p1,p2,temperature=self.args['temperature'])
-            # # TODO: add link prediction loss
-            # 
+            # link prediction loss
+            if links is not None:
+                emb1,emb2,y_link = prepare_link_data(p1,indices,links,self.args['batch_size'])
+                y_link_pred = self.link_predictor((emb1,emb2))
+                bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+                bce_loss = bce(y_link,y_link_pred)
+                loss = loss + bce_loss
+                tf.print("bce_loss: ", bce_loss)
 
         # Compute gradients and update the parameters.
-        learnable_params = (
-            self.encoder.trainable_variables + self.predictor.trainable_variables
-        )
+        if links is not None:
+            learnable_params = (
+                self.encoder.trainable_variables + self.predictor.trainable_variables + self.link_predictor.trainable_variables
+            )
+        else:
+            learnable_params = (
+                self.encoder.trainable_variables + self.predictor.trainable_variables
+            )
         gradients = tape.gradient(loss, learnable_params)
         self.optimizer.apply_gradients(zip(gradients, learnable_params))
 

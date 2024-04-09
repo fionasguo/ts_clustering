@@ -49,12 +49,13 @@ def triplet_formatter(data,max_triplet_len,demo=None):
     return [x.astype(float) for x in [demo,timestamp_array,values_array,feat_dummy_array]]
 
 
-def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
+def tr_te_split(ts_data,aug_data,gt=None,indices=None,links_data=None,tr_frac=0.8,seed=3):
     """
     Args:
         ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
         aug_data: augmented data, same format as ts_data
         gt_data: 1d np array of length N
+        links_data: 2d array (N * max # links across users)
     """
     # shuffle index and reorder based on the shuffle
     np.random.seed(seed)
@@ -70,8 +71,8 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
         tr_aug_data = [x[:int(tr_frac*len(ts_data[0]))] for x in aug_data]
         te_aug_data = [x[int(tr_frac*len(ts_data[0])):] for x in aug_data]
     else:
-        tr_aug_data = None
-        te_aug_data = None
+        tr_aug_data,te_aug_data = None, None
+
     # partition ground truth
     if gt is not None:
         gt = gt[idx]
@@ -80,7 +81,18 @@ def tr_te_split(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     else:
         tr_gt, te_gt = None, None
 
-    return (tr_data,tr_aug_data), tr_gt, (te_data,te_aug_data), te_gt
+    # link prediction data
+    if links_data is not None:
+        indices = indices[idx]
+        links_data = links_data[idx]
+        tr_links_data = links_data[:int(tr_frac*len(ts_data[0]))]
+        te_links_data = links_data[int(tr_frac*len(ts_data[0])):]
+        tr_indices = indices[:int(tr_frac*len(ts_data[0]))]
+        te_indices = indices[int(tr_frac*len(ts_data[0])):]
+    else:
+        tr_links_data, te_links_data, tr_indices, te_indices = None, None, None, None
+
+    return (tr_data,tr_aug_data), (tr_indices,tr_links_data), tr_gt, (te_data,te_aug_data), (te_indices,te_links_data), te_gt
 
 def rvw_blah(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     tr_idx = [ 55026,  32302, 116711,  55009, 115248,  82134,  54991,  12019,
@@ -150,16 +162,16 @@ def rvw_blah(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
     # val and te
     (te_data,te_aug_data), te_gt, (val_data,val_aug_data), val_gt = tr_te_split(te_data,te_aug_data,gt=te_gt,tr_frac=0.5,seed=seed)
 
-    return (tr_data,tr_aug_data), tr_gt, (val_data,val_aug_data), val_gt, (te_data,te_aug_data), te_gt
+    return (tr_data,tr_aug_data), (None,None), tr_gt, (val_data,val_aug_data), (None,None), val_gt, (te_data,te_aug_data), (None,None), te_gt
 
 
-def create_dataset(data_tuple,batch_size):
+def create_dataset(data,batch_size):
     """
     create tf.data.Dataset from np arrays
-    data_tuple: (ts_data,aug_data)
+    data: ((ts_data,aug_data),(indices,links))
         ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
     """
-    ts_data, aug_data = data_tuple
+    ((ts_data,aug_data),(indices,links)) = data
     ts_data = {
         'demo':ts_data[0],
         'timestamps':ts_data[1],
@@ -173,7 +185,7 @@ def create_dataset(data_tuple,batch_size):
         'feat':aug_data[3]
     }
 
-    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data)).batch(batch_size,drop_remainder=True)
+    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data,indices,links)).batch(batch_size,drop_remainder=True)
 
 def binarize_gt(gt):
     biggest_cluster = np.max(gt)
@@ -189,6 +201,7 @@ def read_data(
         args: dict,
         demo_data_dir: str = None,
         gt_data_dir: str = None,
+        links_data_dir: str = None,
         max_triplet_len: int = 200,
         data_aug: bool = True,
         augmentation_noisiness: float = 0.3,
@@ -202,6 +215,9 @@ def read_data(
         args: training args, a dict
         demo_data_dir: a pkl file when unpickled is a 2d np array (N data points * demo_dim)
         gt_data_dir: a pkl file when unpickled is a 1d np array (N data points * 1), the gt label of the clusters
+        links_data_dir: retweet/following links prediction data, each row is the indices of other users that this user is linked to, 
+            the number of columns equal to the max number of links across all users. padded with -1.
+            a pkl file of a 2d np array (N data points * max # of links)
         max_triplet_len: maximum length of triplets for each data point
         data_aug: whether to perform augmentation
         augmentation_noisiness: how much noise to inject into bootstrapping
@@ -249,6 +265,12 @@ def read_data(
             args['n_classes'] = len(np.unique(gt))
         logging.info(f"check gt data - n_classes={args['n_classes']},#nans={np.isnan(gt).sum()}")
 
+    links_data = None
+    if links_data_dir:
+        links_data = pickle.load(open(links_data_dir,'rb'))
+        links_data = links_data.astype(int)
+        logging.info(f"link prediction data available, shape={links_data.shape}")
+
     # format and combine with demo to input data
     logging.info('start processing data into triplets')
     data = triplet_formatter(ts_data, max_triplet_len, demo_data)
@@ -263,24 +285,27 @@ def read_data(
 
     # train val test split
     if data_split == 'tr-val':
-        tr_data, tr_gt, val_data, val_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
-        te_data, te_gt = None, None
+        tr_data, tr_links_data, tr_gt, val_data, val_links_data, val_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        te_data, te_links_data, te_gt = None, None
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"val_data shape={val_data[0][1].shape}, val indices shape={val_links_data[0].shape}, val_links shape={val_links_data[1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
         
     elif data_split == 'tr-val-te':
-        tr_data, tr_gt, te_data, te_gt = tr_te_split(data,aug_data,gt,tr_frac,seed)
-        te_data, te_gt, val_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,0.5,seed)
+        tr_data, tr_links_data, tr_gt, te_data, te_links_data, te_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        te_data, te_links_data, te_gt, val_data, val_links_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,te_links_data[0],te_links_data[1],0.5,seed)
         # tr_data, tr_gt, val_data, val_gt, te_data, te_gt = rvw_blah(data,aug_data,gt,tr_frac,seed)
-        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #con={np.sum(tr_gt)}\nval_data shape={val_data[0][1].shape}, val_gt shape={val_gt.shape}, #con={np.sum(val_gt)}\nte_data shape={te_data[0][1].shape}, te_gt shape={te_gt.shape}, #con={np.sum(te_gt)}")
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"val_data shape={val_data[0][1].shape}, val indices shape={val_links_data[0].shape}, val_links shape={val_links_data[1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
+        logging.info(f"te_data shape={te_data[0][1].shape}, te indices shape={te_links_data[0].shape}, te_links shape={te_links_data[1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
         
     else:
-        tr_data, tr_gt = (data,aug_data), gt
-        val_data, val_gt = None, None
-        te_data, te_gt = (data,aug_data),gt
-    
-    # logging.info(f"tr_data shape={tr_data[0][1].shape}, nan in tr data={np.isnan(tr_data[0][1]).sum()}, zeros in tr data={(tr_data[0][1]==0.0).sum()}, frac of zeros avg among users={np.mean((tr_data[0][1]==0.0).sum(axis=1)/122/5)}\ntr_aug_data shape={tr_data[1][1].shape}, nan in aug={np.isnan(tr_data[1][1]).sum()}, zeros in aug={(tr_data[1][1]==0.0).sum()}, frac of zeros avg among users={np.mean((tr_data[1][1]==0.0).sum(axis=1)/122/5)}\nte_data shape={te_data[0][1].shape}")
-    # logging.info(f"demo data: shape={tr_data[0][0].shape}, nan={np.isnan(tr_data[0][0]).sum()}, zeros={(tr_data[0][0]==0.0).sum()}, avg among users={np.mean(tr_data[0][0],axis=0)}")
-
+        tr_data, tr_links_data, tr_gt = (data,aug_data), (np.arange(len(data[0])),links_data), gt
+        val_data, val_links_data, val_gt = None, None, None
+        te_data, te_links_data, te_gt = (data,aug_data), (np.arange(len(data[0])),links_data), gt
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"te_data shape={te_data[0][1].shape}, te indices shape={te_links_data[0].shape}, te_links shape={te_links_data[1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
+        
     args['n_feat'] = n_feat
     args['demo_dim'] = demo_dim
 
-    return {'train':(tr_data,tr_gt), 'val':(val_data,val_gt), 'test':(te_data, te_gt)}, args
+    return {'train':(tr_data,tr_links_data,tr_gt), 'val':(val_data,val_links_data,val_gt), 'test':(te_data,te_links_data,te_gt)}, args

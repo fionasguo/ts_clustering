@@ -53,6 +53,7 @@ def read_command_args(args,root_dir):
     parser.add_argument('--trained_classifier_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained classifier model weight dir')
     parser.add_argument('--tau', type=float, required=False, default=1.0, help='controls how much timestamp contributes to the final representation')
     parser.add_argument('--lam', type=float, required=False, default=1.0, help='controls how much timestamp textual features to the final representation')
+    parser.add_argument('--links_dir', type=str, required=False, default=None, help='retweet/following link prediction data directory')
 
     command_args = parser.parse_args()
 
@@ -67,6 +68,7 @@ def read_command_args(args,root_dir):
     args['config_dir'] = os.path.join(root_dir, command_args.config_dir) if command_args.config_dir else None
     args['trained_model_dir'] = os.path.join(root_dir, command_args.trained_model) if command_args.trained_model else None
     args['trained_classifier_model_dir'] = os.path.join(root_dir, command_args.trained_classifier_model) if command_args.trained_classifier_model else None
+    args['links_dir'] = os.path.join(root_dir,command_args.links_dir) if command_args.links_dir else None
     args['output_dir'] = os.path.join(root_dir, command_args.output_dir)
     if not os.path.exists(os.path.join(root_dir, args['output_dir'])):
         os.makedirs(os.path.join(root_dir, args['output_dir']))
@@ -89,7 +91,7 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 32
+    args['batch_size'] = 64
     args['epoch'] = 40
     args['loss_fn'] = 'InfoNCE' #'SimSiam' #
     args['patience'] = 10

@@ -41,9 +41,9 @@ def plot_tsne(feats, labels, fig_save_path: str):
 
 def evaluate(data, modelpath, args):
     """
-    data: {'train':((tr_data,tr_aug_data),tr_gt), 'val':((val_data,val_aug_data),val_gt), 'test':((te_data,te_aug_data),te_gt)}
+    data: {'train':(tr_data,tr_links_data,tr_gt), 'val':(val_data,val_links_data,val_gt), 'test':(te_data,te_links_data,te_gt)}
     """
-    labels = data['test'][1]
+    labels = data['test'][2]
     data1, data2 = data['test'][0]
     
     # load model

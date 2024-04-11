@@ -91,7 +91,7 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 64
+    args['batch_size'] = 32
     args['epoch'] = 40
     args['loss_fn'] = 'InfoNCE' #'SimSiam' #
     args['patience'] = 10

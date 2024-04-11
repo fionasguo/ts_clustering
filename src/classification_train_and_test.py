@@ -18,10 +18,10 @@ from TSCluster import plot_tsne
 def create_classification_dataset(data_tuple,batch_size):
     """
     create tf.data.Dataset from np arrays
-    data_tuple: ((ts_data,aug_data), y)
+    data_tuple: ((ts_data,aug_data), (indices,links), y)
         ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
     """
-    X, y = data_tuple
+    X,_, y = data_tuple
     ts_data = X[0]
     ts_data = {
         'demo':ts_data[0],
@@ -208,6 +208,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
@@ -225,6 +226,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
@@ -239,6 +241,7 @@ if __name__ == '__main__':
                     args=args,
                     demo_data_dir=args['demo_data_dir'],
                     gt_data_dir=args['gt_dir'],
+                    links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
                     data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],

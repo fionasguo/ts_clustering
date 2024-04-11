@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import logging
 import itertools
+from ast import literal_eval
 from tqdm import tqdm
 import torch
 from transformers import AutoTokenizer, AutoModel
@@ -166,28 +167,63 @@ logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
 user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author.username','created_at']),fill_value=0)
 logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(pd.unique(user_ts_data.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data.index.get_level_values(level=1)))}')
 
-# transform into 3-d np array
-ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_3D.pkl','wb'))
-logging.info('finished saving BERT embeddings ts data')
+# # transform into 3-d np array
+# ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+# pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_3D.pkl','wb'))
+# logging.info('finished saving BERT embeddings ts data')
 
 # keep record to make sure users are indexed in the same order
 ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
 logging.info(f"ordered_user_index:\n{list(ordered_user_index)[:10]}")
 
-# select only a period of time
-user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-01-01',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-05-02',tz='utc'))]
-logging.info(f'user ts data in selected time range 2022-01-01 to 2022-05-02 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
-ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0101_0502_3D.pkl','wb'))
+# # select only a period of time
+# user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-01-01',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-05-02',tz='utc'))]
+# logging.info(f'user ts data in selected time range 2022-01-01 to 2022-05-02 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
+# ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+# pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0101_0502_3D.pkl','wb'))
 
-user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-06-24',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-11-08',tz='utc'))]
-logging.info(f'user ts data in selected time range 2022-06-24 to 2022-11-08 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
-ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0624_1108_3D.pkl','wb'))
+# user_ts_data_ = user_ts_data[(user_ts_data.index.get_level_values(level=1)>=pd.Timestamp('2022-06-24',tz='utc'))&(user_ts_data.index.get_level_values(level=1)<pd.Timestamp('2022-11-08',tz='utc'))]
+# logging.info(f'user ts data in selected time range 2022-06-24 to 2022-11-08 - shape: {user_ts_data_.shape}; number of users: {len(pd.unique(user_ts_data_.index.get_level_values(level=0)))}, len of entire time range: {len(pd.unique(user_ts_data_.index.get_level_values(level=1)))}')
+# ts_array = np.array(user_ts_data_.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+# pickle.dump(ts_array[:,:,:-1], open('/nas/eclairnas01/users/siyiguo/rvw_data/bert_embeddings_emotmf_ts_data_0624_1108_3D.pkl','wb'))
+
+
+####################### retweet links data ########################
+links_data = pickle.load(open('/nas/eclairnas01/users/siyiguo/rvw_data/rvw_user_links.pkl','rb'))
+logging.info(links_data.dtypes)
+
+def fn_a(lst):
+    return [dic[x] for x in lst if dic.get(x) is not None]
+
+def fn_b(item):
+    if item == '[]':
+        item=literal_eval(item)
+    return item
+
+user_links = links_data.groupby(['author.username'])['retweeted_user_id'].apply(list)
+user_links = pd.DataFrame(user_links)
+user_links['author.id'] = links_data.groupby(['author.username'])['author.id'].first()
+
+missing_index = list(ordered_user_index.difference(user_links.index))
+logging.info(f"link pred data num users={len(user_links)}, our data num usrs={len(ordered_user_index)}, missing users in demo data: len={len(missing_index)}")
+for u in missing_index:
+    user_links.loc[u,'retweeted_user_id'] = '[]'
+user_links['retweeted_user_id'] = user_links['retweeted_user_id'].apply(fn_b)
+
+user_links = user_links.loc[ordered_user_index,]
+user_links = user_links.set_index('author.id')
+dic = {u:i for i,u in enumerate(list(user_links.index))}
+user_links['retweeted_user_id'] = user_links['retweeted_user_id'].apply(fn_a)
+max_links_len = user_links['retweeted_user_id'].apply(len).max()
+logging.info(f"user links: max_links_len={max_links_len}, avg links len = {user_links['retweeted_user_id'].apply(len).mean()}, median links len={user_links['retweeted_user_id'].apply(len).median()}")
+user_links_array = user_links['retweeted_user_id'].tolist()
+user_links_array = np.array([(n+[-1]*max_links_len)[:max_links_len] for n in user_links_array])
+logging.info(f'shape of np array for the user links data: {user_links_array.shape}')
+pickle.dump(user_links_array, open(data_dir+'links_data.pkl','wb'))
+
 
 ####################### demographic data ########################
 # demo_cols = ['author.public_metrics.followers_count','author.public_metrics.following_count','author.public_metrics.tweet_count']

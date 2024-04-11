@@ -94,7 +94,7 @@ def tr_te_split(ts_data,aug_data,gt=None,indices=None,links_data=None,tr_frac=0.
 
     return (tr_data,tr_aug_data), (tr_indices,tr_links_data), tr_gt, (te_data,te_aug_data), (te_indices,te_links_data), te_gt
 
-def rvw_blah(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
+def rvw_blah(ts_data,aug_data,gt=None,indices=None,links_data=None,tr_frac=0.8,seed=3):
     tr_idx = [ 55026,  32302, 116711,  55009, 115248,  82134,  54991,  12019,
         41424,  55021,  39729,  54999,  55033,  55011,  30263,  64876,
         55020,  88313,  51210,  51238,  51181,   7269,  55007,  51193,
@@ -158,11 +158,18 @@ def rvw_blah(ts_data,aug_data,gt=None,tr_frac=0.8,seed=3):
         te_gt = np.delete(gt,tr_idx,axis=0)
     else:
         tr_gt, te_gt = None, None
-
+    # link prediction data
+    if links_data is not None:
+        tr_indices = indices[tr_idx]
+        tr_links_data = links_data[tr_idx]
+        te_links_data = np.delete(links_data,tr_idx,axis=0)
+        te_indices = np.delete(indices,tr_idx,axis=0)
+    else:
+        tr_links_data, te_links_data, tr_indices, te_indices = None, None, None, None
     # val and te
-    (te_data,te_aug_data), te_gt, (val_data,val_aug_data), val_gt = tr_te_split(te_data,te_aug_data,gt=te_gt,tr_frac=0.5,seed=seed)
+    (te_data,te_aug_data),(te_indices,te_links_data), te_gt, (val_data,val_aug_data),(val_indices,val_links_data), val_gt = tr_te_split(te_data,te_aug_data,gt=te_gt,indices=te_indices,links_data=te_links_data,tr_frac=0.5,seed=seed)
 
-    return (tr_data,tr_aug_data), (None,None), tr_gt, (val_data,val_aug_data), (None,None), val_gt, (te_data,te_aug_data), (None,None), te_gt
+    return (tr_data,tr_aug_data), (tr_indices,tr_links_data), tr_gt, (val_data,val_aug_data), (val_indices,val_links_data), val_gt, (te_data,te_aug_data), (te_indices,te_links_data), te_gt
 
 
 def create_dataset(data,batch_size):
@@ -287,23 +294,26 @@ def read_data(
     if data_split == 'tr-val':
         tr_data, tr_links_data, tr_gt, val_data, val_links_data, val_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
         te_data, te_links_data, te_gt = None, None
-        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
-        logging.info(f"val_data shape={val_data[0][1].shape}, val indices shape={val_links_data[0].shape}, val_links shape={val_links_data[1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"val_data shape={val_data[0][1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
+        if links_data is not None: logging.info(f"tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}")
         
     elif data_split == 'tr-val-te':
-        tr_data, tr_links_data, tr_gt, te_data, te_links_data, te_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
-        te_data, te_links_data, te_gt, val_data, val_links_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,te_links_data[0],te_links_data[1],0.5,seed)
-        # tr_data, tr_gt, val_data, val_gt, te_data, te_gt = rvw_blah(data,aug_data,gt,tr_frac,seed)
-        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
-        logging.info(f"val_data shape={val_data[0][1].shape}, val indices shape={val_links_data[0].shape}, val_links shape={val_links_data[1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
-        logging.info(f"te_data shape={te_data[0][1].shape}, te indices shape={te_links_data[0].shape}, te_links shape={te_links_data[1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
+        # tr_data, tr_links_data, tr_gt, te_data, te_links_data, te_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        # te_data, te_links_data, te_gt, val_data, val_links_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,te_links_data[0],te_links_data[1],0.5,seed)
+        tr_data, tr_links_data, tr_gt, val_data, val_links_data, val_gt, te_data, te_links_data, te_gt = rvw_blah(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"val_data shape={val_data[0][1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
+        logging.info(f"te_data shape={te_data[0][1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
+        if links_data is not None: logging.info(f"tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}")
         
     else:
         tr_data, tr_links_data, tr_gt = (data,aug_data), (np.arange(len(data[0])),links_data), gt
         val_data, val_links_data, val_gt = None, None, None
         te_data, te_links_data, te_gt = (data,aug_data), (np.arange(len(data[0])),links_data), gt
-        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
-        logging.info(f"te_data shape={te_data[0][1].shape}, te indices shape={te_links_data[0].shape}, te_links shape={te_links_data[1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
+        logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
+        logging.info(f"te_data shape={te_data[0][1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
+        if links_data is not None: logging.info(f"tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}")
         
     args['n_feat'] = n_feat
     args['demo_dim'] = demo_dim

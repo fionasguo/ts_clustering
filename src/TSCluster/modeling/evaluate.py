@@ -36,7 +36,11 @@ def plot_tsne(feats, labels, fig_save_path: str):
                           legend="full",
                           alpha=0.3).get_figure()
 
-    fig.savefig(fig_save_path + 'tsne.png', format='png')
+    # plt.scatter(tsne_results[labels==0,0],tsne_results[labels==0,1],color='lightskyblue',alpha=0.5,s=3,label='Liberal')
+    # plt.scatter(tsne_results[labels==1,0],tsne_results[labels==1,1],color='lightcoral',alpha=0.3,s=3,label='Conservative')
+    # plt.legend(ncol=2)
+
+    plt.savefig(fig_save_path + 'tsne.png', format='png')
 
 
 def evaluate(data, modelpath, args):

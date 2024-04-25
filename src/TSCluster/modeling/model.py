@@ -134,6 +134,13 @@ def get_link_predictor(input_dim, hid_dim, weight_decay):
     emb2 = Input((input_dim,))
     x = Concatenate(axis=-1)([emb1, emb2])
 
+    # x = Dense(
+    #             hid_dim*2,
+    #             use_bias=False,
+    #             kernel_regularizer=regularizers.l2(weight_decay),
+    #         )(x)
+    # x = ReLU()(x)
+    # x = BatchNormalization()(x)
     x = Dense(
                 hid_dim,
                 use_bias=False,

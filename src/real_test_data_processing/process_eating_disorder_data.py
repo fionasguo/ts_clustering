@@ -95,6 +95,9 @@ all_embeddings = reducer.fit_transform(all_embeddings)
 logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
 df[list(range(n_comp))] = all_embeddings
 
+df = df[df['community_id']<=6]
+logging.info(f"first 7 communities, shape={df.shape}")
+
 user_ts_data = df.groupby(['author_id',pd.Grouper(freq=agg_time_period,key='created_at')])[list(range(n_comp))].sum()
 user_ts_data['tweet_count'] = df.groupby(['author_id',pd.Grouper(freq=agg_time_period,key='created_at')])['tweet_id'].count()
 logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
@@ -102,16 +105,43 @@ logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
 user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author_id','created_at']),fill_value=0)
 logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; number of users: {len(active_user_set)}, len of entire time range: {len(entire_time_range)}')
 
-# transform into 3-d np array
-ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-pickle.dump(ts_array, open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/bert_embeddings_ts_data.pkl','wb'))
-logging.info('finished saving BERT embeddings ts data')
+# # transform into 3-d np array
+# ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+# pickle.dump(ts_array, open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/bert_embeddings_ts_data.pkl','wb'))
+# logging.info('finished saving BERT embeddings ts data')
 
 
 ######################## ground truth data - hashtag_coord ########################
 # get ground truth data
 ordered_user_index = user_ts_data.groupby(level=0)['tweet_count'].first().index
+
 gt = df.groupby('author_id')['community_id'].first().loc[ordered_user_index,]
 pickle.dump(gt.values,open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/gt_data.pkl','wb'))
 logging.info('finished saving ground truth data')
+
+df['neg_emot'] = df['Anger'] + df['Disgust']
+df['pos_emot'] = df['Joy'] + df['Optimism'] + df['Love']
+df['total_toxicity'] = df['toxicity'] + df['severe_toxicity'] + df['obscene'] + df['threat'] + df['insult'] + df['identity_attack']
+gt_neg = df.groupby('author_id')['neg_emot'].mean().loc[ordered_user_index,]
+pickle.dump(gt_neg.values,open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/gt_data_neg_emot.pkl','wb'))
+gt_pos = df.groupby('author_id')['pos_emot'].mean().loc[ordered_user_index,]
+pickle.dump(gt_pos.values,open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/gt_data_pos_emot.pkl','wb'))
+gt_toxicity = df.groupby('author_id')['total_toxicity'].mean().loc[ordered_user_index,]
+pickle.dump(gt_toxicity.values,open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/gt_data_toxicity.pkl','wb'))
+
+
+# ######################## retweet links data ########################
+# def fn_a(lst):
+#     return [dic[x] for x in lst if dic.get(x) is not None]
+
+# user_links = df.groupby(['author_id'])['parent_author_id'].apply(list)
+# user_links = user_links.loc[ordered_user_index,]
+# dic = {u:i for i,u in enumerate(list(user_links.index))}
+# user_links = user_links.apply(fn_a)
+# max_links_len = user_links.apply(len).max()
+# logging.info(f"user links: max_links_len={max_links_len}, avg links len = {user_links.apply(len).mean()}, median links len={user_links.apply(len).median()}")
+# user_links_array = user_links.tolist()
+# user_links_array = np.array([(n+[-1]*max_links_len)[:max_links_len] for n in user_links_array])
+# logging.info(f'shape of np array for the user links data: {user_links_array.shape}')
+# pickle.dump(user_links_array, open('/nas/eclairnas01/users/siyiguo/eating_disorder_data/links_data.pkl','wb'))

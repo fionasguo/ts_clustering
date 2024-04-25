@@ -263,6 +263,14 @@ def read_data(
     if gt_data_dir:
         gt = pickle.load(open(gt_data_dir,'rb'))
         gt = gt.astype(float)
+
+        # # TODO: DELETE!!!
+        # mask = gt<=6
+        # ts_data = ts_data[mask,:,:]
+        # gt = gt[mask]
+        # N = len(gt)
+        # # TODO: DELETE!!!
+
         if len(gt) != N:
             raise ValueError('Dimension mismatch between TS and groundtruth data')
         if args['binarize_gt']:
@@ -299,9 +307,9 @@ def read_data(
         if links_data is not None: logging.info(f"tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}")
         
     elif data_split == 'tr-val-te':
-        # tr_data, tr_links_data, tr_gt, te_data, te_links_data, te_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
-        # te_data, te_links_data, te_gt, val_data, val_links_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,te_links_data[0],te_links_data[1],0.5,seed)
-        tr_data, tr_links_data, tr_gt, val_data, val_links_data, val_gt, te_data, te_links_data, te_gt = rvw_blah(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        tr_data, tr_links_data, tr_gt, te_data, te_links_data, te_gt = tr_te_split(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
+        te_data, te_links_data, te_gt, val_data, val_links_data, val_gt = tr_te_split(te_data[0],te_data[1],te_gt,te_links_data[0],te_links_data[1],0.5,seed)
+        # tr_data, tr_links_data, tr_gt, val_data, val_links_data, val_gt, te_data, te_links_data, te_gt = rvw_blah(data,aug_data,gt,np.arange(len(data[0])),links_data,tr_frac,seed)
         logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
         logging.info(f"val_data shape={val_data[0][1].shape}, val_gt shape={val_gt.shape}, #label '1'={np.sum(val_gt)}")
         logging.info(f"te_data shape={te_data[0][1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")

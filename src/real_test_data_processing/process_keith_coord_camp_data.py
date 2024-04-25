@@ -8,8 +8,9 @@ from os import listdir
 from os.path import isfile, join, isdir
 from glob import glob
 import pickle
-import os
+import os,sys
 from datetime import datetime
+from ast import literal_eval
 import logging
 from tweet_preprocessing import preprocess_tweet
 from tqdm import tqdm
@@ -25,7 +26,7 @@ from sklearn.decomposition import PCA
 # tokenizer = AutoTokenizer.from_pretrained(MODEL)
 # model = AutoModel.from_pretrained(MODEL).to(device)
 
-n_comp = 5
+# n_comp = 5
 
 def create_logger():
     try:
@@ -41,47 +42,117 @@ create_logger()
 
 # # combine control and drivers together for each country
 # data_dir = '/nas/eclairnas01/users/siyiguo/hashed_infoOps/'
-# nations = ['cnhu','venezuela','egyptuae']
+# nations = ['cnhu'] # ,'venezuela','egyptuae'
 
 # for n in nations:
 #     path = data_dir+n+'/'
-#     infoOps = [f for f in listdir(path)]
-#     logging.info(f"Nation: {n}, num of files: {len(infoOps)}")
+#     # infoOps = [f for f in listdir(path)]
+#     # logging.info(f"Nation: {n}, num of files: {len(infoOps)}")
 
-#     control = pd.DataFrame()
-#     treated = pd.DataFrame()
-#     for file in infoOps:
-#         if 'control_user' in file:
-#             control = pd.concat([control, pd.read_csv(path+file, lineterminator='\n')])
-#             logging.info(f"control file {file}, shape: {control.shape}\n{control.columns}\n")
-#         elif '.csv' in file and 'control' not in file:
-#             treated = pd.concat([treated, pd.read_csv(path+file, lineterminator='\n')])
-#             logging.info(f"treated file {file}, shape: {treated.shape}\n{treated.columns}\n")
-#     control['label'] = 0
-#     treated['label'] = 1
+#     # control = pd.DataFrame()
+#     # treated = pd.DataFrame()
+#     # for file in infoOps:
+#     #     if 'control_user' in file:
+#     #         control = pd.concat([control, pd.read_csv(path+file, lineterminator='\n')])
+#     #         logging.info(f"control file {file}, shape: {control.shape}\n")
+#     #     elif '.csv' in file and 'control' not in file:
+#     #         treated = pd.concat([treated, pd.read_csv(path+file, lineterminator='\n')])
+#     #         logging.info(f"treated file {file}, shape: {treated.shape}\n")
+#     # control['label'] = 0
+#     # treated['label'] = 1
 
-#     # process control data
-#     if 'userid' not in list(control.columns):
-#         tmp = control['user'].apply(pd.Series)
-#         tmp = tmp.rename(columns={k:'user_'+k for k in list(tmp.columns)})
-#         control = pd.concat([control.drop(['user'], axis=1), tmp], axis=1)
-#     control = control.rename(columns={'id':'tweetid','full_text':'tweet_text','lang':'tweet_language','created_at':'tweet_time',
-#                                       'user_id':'userid','user_description':'user_profile_description',
-#                                       'user_followers_count':'follower_count','user_friends_count':'following_count',
-#                                       'user_location':'user_reported_location','tweet_hashtags':'hashtags'})
+#     # logging.info(f"{n} aggregated. control shape={control.shape}, treated shape={treated.shape}")
 
-#     logging.info(f"agg control file: shape={control.shape}, min date:{control['tweet_time'].min()}, max date:{control['tweet_time'].max()}, num users: {len(pd.unique(control['userid']))}\n{control.columns}")
-#     logging.info(f"agg treated file: shape={treated.shape}, min date:{treated['tweet_time'].min()}, max date:{treated['tweet_time'].max()}, num users: {len(pd.unique(treated['userid']))}\n{treated.columns}")
+#     # if n == 'venezuela':
+#     #     start_date = '2017-01-01'
+#     #     end_date = '2021-06-03'
+#     #     agg_time_period='3D'
+#     # elif n == 'egyptuae':
+#     #     start_date = '2016-01-01'
+#     #     end_date = '2019-08-05'
+#     #     agg_time_period='3D'
+#     # else:
+#     #     start_date = '2019-04-21'
+#     #     end_date = '2021-04-05'
+#     #     agg_time_period='3D'
+#     # entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period,tz='utc')
 
-#     target_cols = ['tweetid', 'userid', 'user_screen_name', 'user_profile_description',
-#                     'follower_count', 'following_count','tweet_language',
-#                     'tweet_text', 'tweet_time', 'label',
-#                     'in_reply_to_userid', 'retweet_userid', 'hashtags']
-#     control = control[target_cols]
-#     treated = treated[target_cols]
+#     # control['tweet_time'] = pd.to_datetime(control['tweet_time'],utc=True,format='mixed')
+#     # logging.info(f"control min date:{control['tweet_time'].min()}, max date:{control['tweet_time'].max()}")
+#     # treated['tweet_time'] = pd.to_datetime(treated['tweet_time'],utc=True,format='mixed')
+#     # logging.info(f"treated min date:{treated['tweet_time'].min()}, max date:{treated['tweet_time'].max()}")
 
-#     pd.concat([control,treated],axis=0).to_csv(data_dir+n+'/all_controls_drivers_w_links.csv',index=False)
-#     logging.info(f"{n} saved. control shape={control.shape}, treated shape={treated.shape}")
+#     # control = control[(control['tweet_time']>=pd.Timestamp(start_date,tz='utc')) & (control['tweet_time']<=pd.Timestamp(end_date,tz='utc'))]
+#     # treated = treated[(treated['tweet_time']>=pd.Timestamp(start_date,tz='utc')) & (treated['tweet_time']<=pd.Timestamp(end_date,tz='utc'))]
+#     # logging.info(f"data {start_date} to {end_date} {agg_time_period}: control shape={control.shape}, treated shape={treated.shape}")
+
+#     # control.to_csv(data_dir+n+'/all_controls.csv',index=False)
+#     # treated.to_csv(data_dir+n+'/all_drivers.csv',index=False)
+
+#     control = pd.read_csv(path + 'all_controls.csv', lineterminator='\n')
+
+#     # split
+#     chunk_size = 2000000
+#     n_chunks = math.ceil(len(control)/chunk_size)
+#     for i in range(n_chunks):
+#         control[i*chunk_size:(i+1)*chunk_size].to_csv(path+f'all_controls_{i}.csv',index=False)
+
+#     # # process control data
+#     # control = control.rename(columns={'tweet_hashtags':'hashtags'})
+#     # control = control.reset_index(drop=True)
+    
+#     # def fn_a(row):
+#     #     try:
+#     #         tmp = literal_eval(row['data_referenced_tweets'])
+#     #         for i in tmp:
+#     #             if i['type'] == 'retweeted':
+#     #                 row['retweet_tweetid'] = i['id']
+#     #                 row['is_retweet'] = True
+                    
+#     #                 match = re.search(r'RT @([A-Za-z0-9_]+)',row['tweet_text'])
+#     #                 if match:
+#     #                     row['retweet_username'] = match.group(1)
+#     #                 else:
+#     #                     logging.info(f"{row.name} {row['data_referenced_tweets']}  {row['tweet_text']}")
+#     #                     row['retweet_username'] = None
+#     #     except:
+#     #         pass
+#     #     return row
+    
+#     # def fn_b(string):
+#     #     try:
+#     #         return literal_eval(string)
+#     #     except:
+#     #         return None
+
+#     # tqdm.pandas()
+
+#     # control[['is_retweet','retweet_userid', 'retweet_tweetid', 'retweet_username']] = None # wrong from keith's data
+#     # control = control.progress_apply(fn_a,axis=1)
+
+#     # treated['retweet_username'] = None
+
+#     # logging.info(f"agg control file: shape={control.shape}, min date:{control['tweet_time'].min()}, max date:{control['tweet_time'].max()}, num users: {len(pd.unique(control['userid']))}\n{control.columns}")
+#     # logging.info(f"agg treated file: shape={treated.shape}, min date:{treated['tweet_time'].min()}, max date:{treated['tweet_time'].max()}, num users: {len(pd.unique(treated['userid']))}\n{treated.columns}")
+
+#     # control.to_csv(data_dir+n+'/all_controls.csv',index=False)
+#     # treated.to_csv(data_dir+n+'/all_drivers.csv',index=False)
+
+#     # target_cols = ['tweetid', 'userid', 'user_screen_name', 'user_profile_description',
+#     #                 'follower_count', 'following_count','tweet_language',
+#     #                 'tweet_text', 'tweet_time', 'label',
+#     #                 'in_reply_to_userid', 'is_retweet', 'retweet_tweetid', 'retweet_userid', 'retweet_username', 
+#     #                 'hashtags','urls']
+    
+    
+#     # control = control[target_cols]
+#     # treated = treated[target_cols]
+#     # logging.info(f"{n} aggregated. control shape={control.shape}, treated shape={treated.shape}")
+
+#     # treated = pd.concat([control,treated],axis=0)
+
+#     # treated.to_csv(data_dir+n+'/all_controls_drivers_to_valeria.csv',index=False)
+#     # logging.info(f"{n} saved.")
 
 
 """
@@ -112,18 +183,30 @@ Index(['tweetid', 'userid', 'user_display_name', 'user_screen_name',
 """
 egyptuae: '2016-01-01' to '2019-08-05', 3D
 venezuela: '2017-01-01' to '2021-06-03' 3D
-cnhu: '2019-04-22' to '2021-04-04' 3D
+cnhu: '2019-04-21' to '2021-04-05' 3D
 """
 
+n = sys.argv[1]
 
-start_date = '2017-01-01'
-end_date = '2021-06-03'
-agg_time_period='3D'
+if n == 'venezuela':
+    start_date = '2017-01-01'
+    end_date = '2021-06-03'
+    agg_time_period='3D'
+elif n == 'egyptuae':
+    start_date = '2016-01-01'
+    end_date = '2019-08-05'
+    agg_time_period='3D'
+else:
+    start_date = '2019-04-21'
+    end_date = '2021-04-05'
+    agg_time_period='3D'
+
 entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period,tz='utc')
 
-data_dir = '/nas/eclairnas01/users/siyiguo/hashed_infoOps/venezuela/'
+data_dir = '/nas/eclairnas01/users/siyiguo/hashed_infoOps/'+n+'/'
+logging.info(data_dir)
 
-df = pd.read_csv(data_dir+'all_controls_drivers_w_links.csv',lineterminator='\n')
+df = pd.read_csv(data_dir+'all_controls_drivers.csv',lineterminator='\n')
 
 df['tweet_time'] = pd.to_datetime(df['tweet_time'],utc=True,format='mixed')
 logging.info(f"min date:{df['tweet_time'].min()}, max date:{df['tweet_time'].max()}")
@@ -147,114 +230,50 @@ logging.info(f"{agg_time_period} num tweets avg across days for each user. sum={
 logging.info(f"0.5 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.5)}, 0.75 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.75)}, 0.8 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.8)}, 0.9 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.9)}")
 logging.info('\n\n')
 
-# ######################## BERT embedding features ########################
-# # logging.info('start computing XLMT embeddings')
-# # all_embeddings = np.empty((0,768))
-# # for i in tqdm(range(len(df)//batch_size+1)):
-# #     tmp = df[i*batch_size:(i+1)*batch_size]
-# #     tmp['tweet_text'] = tmp['tweet_text'].apply(preprocess_tweet)
-# #     encoded_input = tokenizer(tmp['tweet_text'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
-# #     with torch.no_grad():
-# #         embeddings = model(**encoded_input).pooler_output
-# #     embeddings = embeddings.cpu().numpy()
-# #     all_embeddings = np.vstack((all_embeddings,embeddings))
-# #     if all_embeddings.shape[0] >= 5000000:
-# #         logging.info(f'saving intermediate XLMT embeddings at batch={i}, embeddings shape: {all_embeddings.shape}')
-# #         pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings_{i}.pkl','wb'))
-# #         all_embeddings = np.empty((0,768))
+# # ######################## BERT embedding features ########################
+# # # logging.info('start computing XLMT embeddings')
+# # # all_embeddings = np.empty((0,768))
+# # # for i in tqdm(range(len(df)//batch_size+1)):
+# # #     tmp = df[i*batch_size:(i+1)*batch_size]
+# # #     tmp['tweet_text'] = tmp['tweet_text'].apply(preprocess_tweet)
+# # #     encoded_input = tokenizer(tmp['tweet_text'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
+# # #     with torch.no_grad():
+# # #         embeddings = model(**encoded_input).pooler_output
+# # #     embeddings = embeddings.cpu().numpy()
+# # #     all_embeddings = np.vstack((all_embeddings,embeddings))
+# # #     if all_embeddings.shape[0] >= 5000000:
+# # #         logging.info(f'saving intermediate XLMT embeddings at batch={i}, embeddings shape: {all_embeddings.shape}')
+# # #         pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings_{i}.pkl','wb'))
+# # #         all_embeddings = np.empty((0,768))
 
-# # logging.info(f'XLMT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
-# # pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings_{i}.pkl','wb'))
-# # logging.info('XLMT embeddings saved.')
+# # # logging.info(f'XLMT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
+# # # pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings_{i}.pkl','wb'))
+# # # logging.info('XLMT embeddings saved.')
 
-# # del all_embeddings
-# # del df
-# # gc.collect()
-
-# # all_embeddings = np.empty((0,768))
-# # emb_files = glob(data_dir+'xlmt_embeddings_*.pkl')
-# # for f in emb_files:
-# #     logging.info(f)
-# #     tmp = pickle.load(open(f,'rb'))
-# #     idx = np.random.randint(len(tmp), size=len(tmp)//2)
-# #     tmp = tmp[idx,:]
-# #     all_embeddings = np.vstack((all_embeddings,tmp))
-
-# #     del tmp
-# #     gc.collect()
-# # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
-# # # pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings.pkl','wb'))
-# # # logging.info(f"all embeddings saved")
-
-# # # dim reduction - pca
-# # logging.info('start PCA')
-# # # OOM - sample 50% data to train PCA and transform the rest
-# # # idx = np.random.randint(len(all_embeddings), size=len(all_embeddings)//2)
-# # # all_embeddings = all_embeddings[idx,:]
-# # std_scaler = StandardScaler()
-# # std_scaler = std_scaler.fit(all_embeddings)
-# # all_embeddings = std_scaler.fit_transform(all_embeddings)
-# # pickle.dump(std_scaler,open(data_dir+'std_scaler_model.pkl','wb'))
-# # logging.info("standardized embeddings")
-
-# # reducer = PCA(n_components=n_comp)
-# # reducer = reducer.fit(all_embeddings)
-# # pickle.dump(reducer,open(data_dir+'pca_model.pkl','wb'))
-# # logging.info('PCA model saved')
-
-# # std_scaler = pickle.load(open(data_dir+'std_scaler_model.pkl','rb'))
-# # reducer = pickle.load(open(data_dir+'pca_model.pkl','rb'))
-
-# # emb_files = glob(data_dir+'xlmt_embeddings_*.pkl')
-# # for f in emb_files:
-# #     # logging.info(pickle.load(open(f,'rb')).shape)
-# #     all_embeddings = pickle.load(open(f,'rb'))
-# #     all_embeddings = std_scaler.transform(all_embeddings)
-# #     all_embeddings = reducer.transform(all_embeddings)
-# #     pickle.dump(all_embeddings,open(f"{f.split('.')[0]}_pca.pkl",'wb'))
-# #     logging.info(f'saved bert embeddings pca, shape: {all_embeddings.shape}')
-
-# # del all_embeddings
-# # del reducer
-# # del std_scaler
-# # gc.collect()
-
-# # all_embeddings = np.empty((0,5))
-# # pca_files =  glob(data_dir+'xlmt_embeddings_*_pca.pkl')
-# # for f in pca_files:
-# #     all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
-
-# # logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-# # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
-# # logging.info("PCA embeddings saved.")
-
-# # ts data with another set of features - bert embedding - umap reduced
-# # logging.info('start computing XLMT embeddings')
-# # all_embeddings = np.empty((0,768))
-# # for i in tqdm(range(len(df)//batch_size+1)):
-# #     tmp = df[i*batch_size:(i+1)*batch_size]
-# #     encoded_input = tokenizer(tmp['tweet_text'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
-# #     with torch.no_grad():
-# #         embeddings = model(**encoded_input).pooler_output
-# #     embeddings = embeddings.cpu().numpy()
-# #     all_embeddings = np.vstack((all_embeddings,embeddings))
-# # logging.info(f'XLMT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
-# # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings.pkl','wb'))
-# # logging.info('XLMT embeddings saved.')
-# # all_embeddings = pickle.load(open(data_dir+'xlmt_embeddings.pkl','rb'))
-# # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
-
-# # del df
-# # gc.collect()
+# # # del all_embeddings
+# # # del df
+# # # gc.collect()
 
 # # # all_embeddings = np.empty((0,768))
 # # # emb_files = glob(data_dir+'xlmt_embeddings_*.pkl')
 # # # for f in emb_files:
-# # #     # logging.info(pickle.load(open(f,'rb')).shape)
-# # #     all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
+# # #     logging.info(f)
+# # #     tmp = pickle.load(open(f,'rb'))
+# # #     idx = np.random.randint(len(tmp), size=len(tmp)//2)
+# # #     tmp = tmp[idx,:]
+# # #     all_embeddings = np.vstack((all_embeddings,tmp))
+
+# # #     del tmp
+# # #     gc.collect()
 # # # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
-# # # idx = np.random.randint(len(all_embeddings), size=len(all_embeddings)//2)
-# # # all_embeddings = all_embeddings[idx,:]
+# # # # pickle.dump(all_embeddings,open(f'{data_dir}xlmt_embeddings.pkl','wb'))
+# # # # logging.info(f"all embeddings saved")
+
+# # # # dim reduction - pca
+# # # logging.info('start PCA')
+# # # # OOM - sample 50% data to train PCA and transform the rest
+# # # # idx = np.random.randint(len(all_embeddings), size=len(all_embeddings)//2)
+# # # # all_embeddings = all_embeddings[idx,:]
 # # # std_scaler = StandardScaler()
 # # # std_scaler = std_scaler.fit(all_embeddings)
 # # # all_embeddings = std_scaler.fit_transform(all_embeddings)
@@ -278,20 +297,10 @@ logging.info('\n\n')
 # # #     pickle.dump(all_embeddings,open(f"{f.split('.')[0]}_pca.pkl",'wb'))
 # # #     logging.info(f'saved bert embeddings pca, shape: {all_embeddings.shape}')
 
-# # # # dim reduction - UMAP - OOM
-# # # reducer = umap.UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine',verbose=True)
-# # # all_embeddings = reducer.fit_transform(all_embeddings)
-# # # logging.info(f'UMAP finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-
-# # all_embeddings = pickle.load(open(f'{data_dir}xlmt_embeddings.pkl','rb'))
-# # dim reduction - pca
-# # logging.info('start PCA')
-# # all_embeddings = StandardScaler().fit_transform(all_embeddings)
-# # reducer = PCA(n_components=n_comp)
-# # all_embeddings = reducer.fit_transform(all_embeddings)
-# # logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-# # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
-# # logging.info('PCA saved')
+# # # del all_embeddings
+# # # del reducer
+# # # del std_scaler
+# # # gc.collect()
 
 # # # all_embeddings = np.empty((0,5))
 # # # pca_files =  glob(data_dir+'xlmt_embeddings_*_pca.pkl')
@@ -302,32 +311,138 @@ logging.info('\n\n')
 # # # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
 # # # logging.info("PCA embeddings saved.")
 
-all_embeddings = pickle.load(open(data_dir+'xlmt_embeddings_pca.pkl','rb'))
-logging.info("PCA embeddings loaded.")
+# # # ts data with another set of features - bert embedding - umap reduced
+# # # logging.info('start computing XLMT embeddings')
+# # # all_embeddings = np.empty((0,768))
+# # # for i in tqdm(range(len(df)//batch_size+1)):
+# # #     tmp = df[i*batch_size:(i+1)*batch_size]
+# # #     encoded_input = tokenizer(tmp['tweet_text'].tolist(),max_length=50,truncation=True,padding=True,return_tensors='pt').to(device)
+# # #     with torch.no_grad():
+# # #         embeddings = model(**encoded_input).pooler_output
+# # #     embeddings = embeddings.cpu().numpy()
+# # #     all_embeddings = np.vstack((all_embeddings,embeddings))
+# # # logging.info(f'XLMT embeddings finished, all_embeddings shape: {all_embeddings.shape}')
+# # # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings.pkl','wb'))
+# # # logging.info('XLMT embeddings saved.')
+# # # all_embeddings = pickle.load(open(data_dir+'xlmt_embeddings.pkl','rb'))
+# # # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
+
+# # # del df
+# # # gc.collect()
+
+# all_embeddings = np.empty((0,768))
+# emb_files = glob(data_dir+'xlmt_embeddings_*.pkl')
+# for f in emb_files:
+#     logging.info(f)
+#     logging.info(pickle.load(open(f,'rb')).shape)
+#     all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
+# logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
+# pickle.dump(all_embeddings,data_dir+'xlmt_embeddings.pkl')
+# idx = np.random.randint(len(all_embeddings), size=len(all_embeddings)//2)
+# all_embeddings = all_embeddings[idx,:]
+# std_scaler = StandardScaler()
+# std_scaler = std_scaler.fit(all_embeddings)
+# all_embeddings = std_scaler.fit_transform(all_embeddings)
+# pickle.dump(std_scaler,open(data_dir+'std_scaler_model.pkl','wb'))
+# logging.info("standardized embeddings")
+
+# # # # reducer = PCA(n_components=n_comp)
+# # # # reducer = reducer.fit(all_embeddings)
+# # # # pickle.dump(reducer,open(data_dir+'pca_model.pkl','wb'))
+# # # # logging.info('PCA model saved')
+
+# # # # std_scaler = pickle.load(open(data_dir+'std_scaler_model.pkl','rb'))
+# # # # reducer = pickle.load(open(data_dir+'pca_model.pkl','rb'))
+
+# # # # emb_files = glob(data_dir+'xlmt_embeddings_*.pkl')
+# # # # for f in emb_files:
+# # # #     # logging.info(pickle.load(open(f,'rb')).shape)
+# # # #     all_embeddings = pickle.load(open(f,'rb'))
+# # # #     all_embeddings = std_scaler.transform(all_embeddings)
+# # # #     all_embeddings = reducer.transform(all_embeddings)
+# # # #     pickle.dump(all_embeddings,open(f"{f.split('.')[0]}_pca.pkl",'wb'))
+# # # #     logging.info(f'saved bert embeddings pca, shape: {all_embeddings.shape}')
+
+# # # # # dim reduction - UMAP - OOM
+# # # # reducer = umap.UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine',verbose=True)
+# # # # all_embeddings = reducer.fit_transform(all_embeddings)
+# # # # logging.info(f'UMAP finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+
+n_comp=8
+
+# all_embeddings = pickle.load(open(f'{data_dir}xlmt_embeddings.pkl','rb'))
+# # dim reduction - pca
+# logging.info('start PCA')
+# all_embeddings = StandardScaler().fit_transform(all_embeddings)
+# reducer = PCA(n_components=n_comp)
+# all_embeddings = reducer.fit_transform(all_embeddings)
+# logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+# pickle.dump(all_embeddings,open(data_dir+f'xlmt_embeddings_{n_comp}pca.pkl','wb'))
+# logging.info('PCA saved')
+
+# # # # all_embeddings = np.empty((0,5))
+# # # # pca_files =  glob(data_dir+'xlmt_embeddings_*_pca.pkl')
+# # # # for f in pca_files:
+# # # #     all_embeddings = np.vstack((all_embeddings,pickle.load(open(f,'rb'))))
+
+# # # # logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+# # # # pickle.dump(all_embeddings,open(data_dir+'xlmt_embeddings_pca.pkl','wb'))
+# # # # logging.info("PCA embeddings saved.")
+
+all_embeddings = pickle.load(open(data_dir+f'xlmt_embeddings_{n_comp}pca.pkl','rb'))
+logging.info(f"PCA embeddings loaded {all_embeddings.shape}.")
 
 df[list(range(n_comp))] = all_embeddings
 
-# start_date = '2019-04-22'
-# end_date = '2021-04-04'
-# agg_time_period='3D'
-# entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period,tz='utc')
-# df = df[(df['tweet_time']>=pd.Timestamp(start_date,tz='utc')) & (df['tweet_time']<=pd.Timestamp(end_date,tz='utc'))]
-# logging.info(f"data '2019-04-22' to '2021-04-04' 3D: shape={df.shape}")
+"""
+egyptuae: '2017-01-01' to '2019-08-05', 3D
+venezuela: '2020-01-01' to '2021-06-03' 3D
+cnhu: '2019-04-21' to '2021-04-05' 3D
+"""
+
+if n == 'venezuela': # 1400
+    start_date = '2020-01-01'
+    end_date = '2021-05-31'
+    agg_time_period='2D'
+elif n == 'egyptuae': # 1500
+    start_date = '2017-01-01'
+    end_date = '2019-07-31'
+    agg_time_period='3D'
+else:
+    start_date = '2019-04-21'
+    end_date = '2021-04-05'
+    agg_time_period='3D'
+entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period,tz='utc')
+df = df[(df['tweet_time']>=pd.Timestamp(start_date,tz='utc')) & (df['tweet_time']<=pd.Timestamp(end_date,tz='utc'))]
+logging.info(f"data {start_date} to {end_date} {agg_time_period}: shape={df.shape}")
+
+user_tweet_count = df.groupby('userid')['tweetid'].count()
+logging.info(f"total num of users: {len(user_tweet_count)}")
+logging.info(f"num tweets per user: mean={user_tweet_count.mean()}, std={user_tweet_count.std()}")
+logging.info(f"0.5 quantile={user_tweet_count.quantile(q=0.5)}, 0.75 quantile={user_tweet_count.quantile(q=0.75)}, 0.8 quantile={user_tweet_count.quantile(q=0.8)}, 0.9 quantile={user_tweet_count.quantile(q=0.9)}")
+
+user_ts_count = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])['tweetid'].count()
+logging.info(user_ts_count)
+user_ts_count_ = user_ts_count.reindex(pd.MultiIndex.from_product([user_ts_count.index.levels[0],entire_time_range],names=['userid','tweet_time']),fill_value=0)
+logging.info(user_ts_count_)
+logging.info(f"{agg_time_period} num tweets avg across days for each user. sum={user_ts_count_.sum()}. distr across users: mean={user_ts_count_.groupby(level=0).mean().mean()}, std={user_ts_count_.groupby(level=0).mean().std()}")
+logging.info(f"0.5 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.5)}, 0.75 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.75)}, 0.8 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.8)}, 0.9 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.9)}")
+logging.info('\n\n')
 
 user_ts_data = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])[list(range(n_comp))].sum()
 user_ts_data['tweet_count'] = df.groupby(['userid',pd.Grouper(freq=agg_time_period,key='tweet_time')])['tweetid'].count()
-logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
+logging.info(f"raw user embedding ts data - shape: {user_ts_data.shape}, num users={len(pd.unique(df['userid']))}")
 # fill the time series with the entire time range
 user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['userid','tweet_time']),fill_value=0)
 logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}')
 
-# # transform into 3-d np array
-# ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-# logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-# pickle.dump(ts_array[:,:,:5], open(data_dir+'xlmt_embeddings_ts_data.pkl','wb'))
-# logging.info('finished saving xlmt_embedding ts data')
-# pickle.dump(ts_array[:,:,-1], open(data_dir+'activity_ts_data.pkl','wb'))
-# logging.info('finished saving activity ts data')
+# transform into 3-d np array
+ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+pickle.dump(ts_array[:,:,:5], open(data_dir+'shorter/xlmt_embeddings_ts_data.pkl','wb'))
+logging.info('finished saving xlmt_embedding ts data')
+pickle.dump(ts_array[:,:,-1], open(data_dir+'shorter/activity_ts_data.pkl','wb'))
+logging.info('finished saving activity ts data')
 
 # keep record to make sure users are indexed in the same order
 ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
@@ -336,6 +451,10 @@ ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
 ######################## retweet links data ########################
 def fn_a(lst):
     return [dic[x] for x in lst if dic.get(x) is not None]
+
+user_dic = df[['userid', 'user_screen_name']].drop_duplicates(subset=['user_screen_name']).set_index('user_screen_name').squeeze()
+user_dic = user_dic.to_dict()
+df['retweet_userid'] = df['retweet_username'].apply(lambda x: user_dic.get(x))
 
 user_links = df.groupby(['userid'])['retweet_userid'].apply(list)
 user_links = user_links.loc[ordered_user_index,]
@@ -346,49 +465,49 @@ logging.info(f"user links: max_links_len={max_links_len}, avg links len = {user_
 user_links_array = user_links.tolist()
 user_links_array = np.array([(n+[-1]*max_links_len)[:max_links_len] for n in user_links_array])
 logging.info(f'shape of np array for the user links data: {user_links_array.shape}')
-pickle.dump(user_links_array, open(data_dir+'links_data.pkl','wb'))
+pickle.dump(user_links_array, open(data_dir+'shorter/links_data.pkl','wb'))
 
-# # ######################## demographic data ########################
-# # def fn1(x):
-# #     modes = list(x.mode())
-# #     if len(modes) > 1:
-# #         return 'und'
-# #     else:
-# #         return modes[0]
-
-# demo_colnames = ['follower_count', 'following_count']
-# # build demographic data
-# demo_data = df.groupby(['userid'])[demo_colnames].first()
-# # # process language as lookup table
-# # logging.info(f"processing language categories to int: total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
-# # tmp = pd.Categorical(demo_data['account_language'])
-# # demo_data['account_language'] = tmp.codes
-# # demo_data.loc[demo_data['account_language']==-1,'account_language'] = 3
-# # tmp = df.groupby(['userid'])['tweet_language'].apply(fn1)
-# # tmp = pd.Categorical(tmp)
-# # demo_data['tweet_language'] = tmp.codes
-# # logging.info(f"users' most freq tweet lanuguage {tmp.categories}")
-# # logging.info(f"after lang to code:  total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
-# # save
-# demo_data = demo_data.loc[ordered_user_index,].values
-# logging.info(f'demographic data - shape: {demo_data.shape}')
-# pickle.dump(demo_data,open(data_dir+'demo_data.pkl','wb'))
-
-# # """
-# # target_cols = ['tweetid', 'userid', 'user_screen_name',
-# # #        'user_reported_location', 'user_profile_description',
-# # #        'follower_count', 'following_count','tweet_language',
-# # #        'tweet_text', 'tweet_time', 'label']
-# # """
-# # ######################## ground truth data ########################
-# def fn2(x):
+# ######################## demographic data ########################
+# def fn1(x):
 #     modes = list(x.mode())
 #     if len(modes) > 1:
-#         return 1
+#         return 'und'
 #     else:
 #         return modes[0]
+
+demo_colnames = ['follower_count', 'following_count']
+# build demographic data
+demo_data = df.groupby(['userid'])[demo_colnames].first()
+# # process language as lookup table
+# logging.info(f"processing language categories to int: total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
+# tmp = pd.Categorical(demo_data['account_language'])
+# demo_data['account_language'] = tmp.codes
+# demo_data.loc[demo_data['account_language']==-1,'account_language'] = 3
+# tmp = df.groupby(['userid'])['tweet_language'].apply(fn1)
+# tmp = pd.Categorical(tmp)
+# demo_data['tweet_language'] = tmp.codes
+# logging.info(f"users' most freq tweet lanuguage {tmp.categories}")
+# logging.info(f"after lang to code:  total num of lang={len(pd.unique(demo_data['account_language']))}\n{pd.unique(demo_data['account_language'])}")
+# save
+demo_data = demo_data.loc[ordered_user_index,].values
+logging.info(f'demographic data - shape: {demo_data.shape}')
+pickle.dump(demo_data,open(data_dir+'shorter/demo_data.pkl','wb'))
+
+# """
+# target_cols = ['tweetid', 'userid', 'user_screen_name',
+# #        'user_reported_location', 'user_profile_description',
+# #        'follower_count', 'following_count','tweet_language',
+# #        'tweet_text', 'tweet_time', 'label']
+# """
+# ######################## ground truth data ########################
+def fn2(x):
+    modes = list(x.mode())
+    if len(modes) > 1:
+        return 1
+    else:
+        return modes[0]
     
-# gt_data = df.groupby('userid')['label'].apply(fn2)
-# gt_data = gt_data.loc[ordered_user_index,].values
-# logging.info(f'groundtruth data - shape: {gt_data.shape}, # coord={gt_data.sum()}')
-# pickle.dump(gt_data,open(data_dir+'/gt_data.pkl','wb'))
+gt_data = df.groupby('userid')['label'].apply(fn2)
+gt_data = gt_data.loc[ordered_user_index,].values
+logging.info(f'groundtruth data - shape: {gt_data.shape}, # coord={gt_data.sum()}')
+pickle.dump(gt_data,open(data_dir+'shorter/gt_data.pkl','wb'))

@@ -48,6 +48,8 @@ def read_command_args(args,root_dir):
     parser.add_argument('-t', '--trained_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained model weight dir')
     parser.add_argument('-n', '--augmentation_noisiness', type=float, required=False, default=0.3, help='how much noise to inject when performing positive example augmentation for contrastive learning')
     parser.add_argument('-l', '--max_triplet_len', type=int, required=False, default=1000, help='how much noise to inject when performing positive example augmentation for contrastive learning')
+    parser.add_argument('-b', '--batch_size', type=int, required=False, default=64, help='batch size')
+    parser.add_argument('-e', '--epoch', type=int, required=False, default=60, help='number of epochs')
     parser.add_argument('-s', '--seed', type=int, required=False, default=3, help='random seed')
     parser.add_argument('--temperature', type=float, required=False, default=0.2, help='temperature scaling')
     parser.add_argument('--trained_classifier_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained classifier model weight dir')
@@ -74,6 +76,8 @@ def read_command_args(args,root_dir):
         os.makedirs(os.path.join(root_dir, args['output_dir']))
     args['augmentation_noisiness'] = float(command_args.augmentation_noisiness)
     args['max_triplet_len'] = int(command_args.max_triplet_len)
+    args['batch_size'] = int(command_args.batch_size)
+    args['epoch'] = int(command_args.epoch)
     args['temperature'] = float(command_args.temperature)
     args['seed'] = int(command_args.seed)
     args['tau'] = float(command_args.tau)
@@ -91,8 +95,6 @@ def read_config(args):
     """
     # default values
     args['lr'] = 0.0005
-    args['batch_size'] = 32
-    args['epoch'] = 40
     args['loss_fn'] = 'InfoNCE' #'SimSiam' #
     args['patience'] = 10
     args['weight_decay'] = 0.0005

@@ -86,6 +86,7 @@ if __name__ == '__main__':
                     gt_data_dir=args['gt_dir'],
                     links_data_dir=args['links_dir'],
                     max_triplet_len=args['max_triplet_len'],
+                    data_aug=False,
                     augmentation_noisiness=args['augmentation_noisiness'],
                     data_split='no'
                 )

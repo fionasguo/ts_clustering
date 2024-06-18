@@ -19,12 +19,12 @@ MODEL = 'sentence-transformers/stsb-xlm-r-multilingual' # 'cardiffnlp/twitter-xl
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 model = AutoModel.from_pretrained(MODEL).to(device)
 
-n_comp = 20
+n_comp = 40
 
 user_tot_tweet_threshold = 10
 
-start_date = '2023-08-01'
-end_date = '2023-11-30'
+start_date = '2023-08-05'
+end_date = '2023-11-28'
 agg_time_period='2D'
 entire_time_range = pd.date_range(start=start_date,end=end_date,freq=agg_time_period) # ,tz='utc'
 
@@ -42,23 +42,23 @@ create_logger()
 
 data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 
-# df = pd.read_csv(data_dir+'hammas_reddit_comments_submissions_active_users.csv',lineterminator='\n')
-# logging.info(f'csv file loaded, shape={df.shape}')
-# df.loc[df['text'].isnull(),'text'] = ''
-# df['timestamp'] = pd.to_datetime(df.timestamp) #, unit='ms', utc=True
-# logging.info(f"data shape={df.shape}, columns:\n{df.columns}")
-# logging.info(f"min date: {df['timestamp'].min()}, max date: {df['timestamp'].max()}")
+df = pd.read_csv(data_dir+'hammas_reddit_comments_submissions_active_users.csv',lineterminator='\n')
+logging.info(f'csv file loaded, shape={df.shape}')
+df.loc[df['text'].isnull(),'text'] = ''
+df['timestamp'] = pd.to_datetime(df.timestamp) #, unit='ms', utc=True
+logging.info(f"data shape={df.shape}, columns:\n{df.columns}")
+logging.info(f"min date: {df['timestamp'].min()}, max date: {df['timestamp'].max()}")
 
-# # user_tweet_count = df.groupby('author')['id'].count()
-# # logging.info(f"total num of users: {len(user_tweet_count)}")
-# # logging.info(f"num tweets per user: mean={user_tweet_count.mean()}, std={user_tweet_count.std()}")
-# # logging.info(f"0.5 quantile={user_tweet_count.quantile(q=0.5)}, 0.75 quantile={user_tweet_count.quantile(q=0.75)}, 0.8 quantile={user_tweet_count.quantile(q=0.8)}, 0.9 quantile={user_tweet_count.quantile(q=0.9)}")
+user_tweet_count = df.groupby('author')['id'].count()
+logging.info(f"total num of users: {len(user_tweet_count)}")
+logging.info(f"num tweets per user: mean={user_tweet_count.mean()}, std={user_tweet_count.std()}")
+logging.info(f"0.5 quantile={user_tweet_count.quantile(q=0.5)}, 0.75 quantile={user_tweet_count.quantile(q=0.75)}, 0.8 quantile={user_tweet_count.quantile(q=0.8)}, 0.9 quantile={user_tweet_count.quantile(q=0.9)}")
 
-# # user_ts_count = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])['id'].count()
-# # user_ts_count_ = user_ts_count.reindex(pd.MultiIndex.from_product([user_ts_count.index.levels[0],entire_time_range],names=['author','timestamp']),fill_value=0)
-# # logging.info(f"{agg_time_period} num tweets avg across days for each user. sum={user_ts_count_.sum()}. distr across users: mean={user_ts_count_.groupby(level=0).mean().mean()}, std={user_ts_count_.groupby(level=0).mean().std()}")
-# # logging.info(f"0.5 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.5)}, 0.75 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.75)}, 0.8 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.8)}, 0.9 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.9)}")
-# # logging.info('\n\n')
+user_ts_count = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])['id'].count()
+user_ts_count_ = user_ts_count.reindex(pd.MultiIndex.from_product([user_ts_count.index.levels[0],entire_time_range],names=['author','timestamp']),fill_value=0)
+logging.info(f"{agg_time_period} num tweets avg across days for each user. sum={user_ts_count_.sum()}. distr across users: mean={user_ts_count_.groupby(level=0).mean().mean()}, std={user_ts_count_.groupby(level=0).mean().std()}")
+logging.info(f"0.5 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.5)}, 0.75 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.75)}, 0.8 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.8)}, 0.9 quantile={user_ts_count_.groupby(level=0).mean().quantile(q=0.9)}")
+logging.info('\n\n')
 
 # # # active_users = user_tweet_count[user_tweet_count>=user_tot_tweet_threshold]
 # # # active_user_set = set(active_users.index)
@@ -113,20 +113,17 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 # # # # all_embeddings = pickle.load(open('/nas/eclairnas01/users/siyiguo/incas_data/phase1a_bert_embeddings.pkl','rb'))
 # # # # logging.info(f'loaded saved bert embeddings, shape: {all_embeddings.shape}')
 
-# # # # dim reduction - pca
-# # # logging.info('start PCA')
-# # # all_embeddings = StandardScaler().fit_transform(all_embeddings)
-# # # reducer = PCA(n_components=n_comp)
-# # # all_embeddings = reducer.fit_transform(all_embeddings)
-# # # logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
-# # # pickle.dump(all_embeddings,open(data_dir+'bert_embeddings_pca.pkl','wb'))
-# # # logging.info('PCA saved.')
+all_embeddings = pickle.load(open(data_dir+'bert_embeddings.pkl','rb'))
+logging.info(f"bert embedding loaded shape={all_embeddings.shape}")
 
-# # gt = pd.read_csv(data_dir+'hamas_reddit_gt_data.csv',lineterminator='\n')
-# # gt = gt.reset_index(drop=True)[(~gt['Israel'].isnull()) & (~gt['Palestine'].isnull())]
-# # logging.info(f"gt shape {gt.shape}")
-# # gt = gt.set_index('author')
-# # ordered_user_index = gt.index
+# dim reduction - pca
+logging.info('start PCA')
+all_embeddings = StandardScaler().fit_transform(all_embeddings)
+reducer = PCA(n_components=n_comp)
+all_embeddings = reducer.fit_transform(all_embeddings)
+logging.info(f'PCA finshed, dimension reduced embeddings shape: {all_embeddings.shape}')
+pickle.dump(all_embeddings,open(data_dir+'bert_embeddings_40pca.pkl','wb'))
+logging.info(f'PCA saved. shape = {all_embeddings.shape}')
 
 # # all_embeddings = pickle.load(open(data_dir+'bert_embeddings.pkl','rb'))
 # # logging.info(f"loaded bert embeddings shape={all_embeddings.shape}")
@@ -139,7 +136,17 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 # # all_embeddings = pickle.load(open(data_dir+'bert_embeddings_pca.pkl','rb'))
 # # logging.info(f"loaded pca embeddings shape={all_embeddings.shape}")
 
-# # df[list(range(n_comp))] = all_embeddings
+df[list(range(n_comp))] = all_embeddings
+
+gt = pd.read_csv(data_dir+'hamas_reddit_gt_data.csv',lineterminator='\n')
+gt = gt.reset_index(drop=True)[(~gt['Israel'].isnull()) & (~gt['Palestine'].isnull())]
+logging.info(f"gt shape {gt.shape}")
+gt = gt.set_index('author')
+ordered_user_index = gt.index
+
+df = df[df['author'].isin(ordered_user_index)]
+
+df = df[(df['timestamp']>=pd.Timestamp(start_date)) & (df['timestamp']<=pd.Timestamp(end_date))]
 
 
 # # target_authors = set(['98evpe98', 'AmbzbLfu', 'Aojdl3577', 'BSbtppm', 'Bddpnqmjtife-Bsu6245',
@@ -165,21 +172,21 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 # # df = df[df['authors'].isin(target_authors)]
 
 
-# user_ts_data = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])[['ups','downs']].sum()
-# user_ts_data['tweet_count'] = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])['id'].count()
-# logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
-# # fill the time series with the entire time range
-# user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author','timestamp']),fill_value=0)
-# logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; len of entire time range: {len(entire_time_range)}')
+user_ts_data = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])[list(range(n_comp))].sum()
+user_ts_data['tweet_count'] = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])['id'].count()
+logging.info(f'raw user embedding ts data - shape: {user_ts_data.shape}')
+# fill the time series with the entire time range
+user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author','timestamp']),fill_value=0)
+logging.info(f'user ts data filled up to entire time range - shape: {user_ts_data.shape}; len of entire time range: {len(entire_time_range)}')
 
-# # # transform into 3-d np array
-# # ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
-# # logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
-# # pickle.dump(ts_array[:,:,:-1], open(data_dir+'xlmt_embeddings_ts_data.pkl','wb'))
-# # logging.info('finished saving xlmt_embedding ts data')
+# transform into 3-d np array
+ts_array = np.array(user_ts_data.groupby(level=0).apply(lambda x: x.values.tolist()).tolist())
+logging.info(f'shape of np array for the ts data: {ts_array.shape}, mean of embeddings: {np.mean(ts_array,axis=1)}')
+pickle.dump(ts_array[:,:,:-1], open(data_dir+'xlmt_embeddings_ts_data.pkl','wb'))
+logging.info('finished saving xlmt_embedding ts data')
 
-# # pickle.dump(ts_array[:,:,-1], open(data_dir+'activity_ts_data.pkl','wb'))
-# # logging.info('finished saving activity ts data')
+pickle.dump(ts_array[:,:,-1], open(data_dir+'activity_ts_data.pkl','wb'))
+logging.info('finished saving activity ts data')
 
 # # user_ts_data = df.groupby(['author',pd.Grouper(freq=agg_time_period,key='timestamp')])[list(range(n_comp))].mean()
 # # user_ts_data = user_ts_data.reindex(pd.MultiIndex.from_product([user_ts_data.index.levels[0],entire_time_range],names=['author','timestamp']),fill_value=0)
@@ -188,18 +195,18 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 # # logging.info('finished saving avg embeddings ts data')
 
 
-# ordered_user_index = user_ts_data.groupby(level=0)['ups'].first().index
+ordered_user_index = user_ts_data.groupby(level=0)[0].first().index
 
-# # ######################## demographic data ########################
-# # # build demographic data
-# # demo_colnames = ['ups', 'downs']
-# # demo_data = df.groupby(['author'])[demo_colnames].sum()
-# # # make sure users are indexed in the same order
+######################## demographic data ########################
+# build demographic data
+demo_colnames = ['ups', 'downs']
+demo_data = df.groupby(['author'])[demo_colnames].sum()
+# make sure users are indexed in the same order
 
-# # demo_data = demo_data.loc[ordered_user_index,].values
-# # logging.info(f'demographic data - shape: {demo_data.shape}')
-# # pickle.dump(demo_data,open(data_dir+'demo_data.pkl','wb'))
-# # logging.info('finished saving demo data')
+demo_data = demo_data.loc[ordered_user_index,].values
+logging.info(f'demographic data - shape: {demo_data.shape}')
+pickle.dump(demo_data,open(data_dir+'demo_data.pkl','wb'))
+logging.info('finished saving demo data')
 
 # # # ####################### ground truth data ########################
 # # # # get ground truth data
@@ -216,7 +223,10 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 
 # # # authors_w_10_texts.loc[ordered_user_index].to_csv(data_dir+'authors_w_10_texts.csv')
 
-# # ######################## retweet links data ########################
+logging.info(f"gt data shape {gt.loc[ordered_user_index,'Israel'].values.shape}")
+pickle.dump(gt.loc[ordered_user_index,'Israel'].values,open(data_dir+'gt_data_Israel.pkl','wb'))
+
+# ######################## retweet links data ########################
 
 # gt = pd.read_csv(data_dir+'hamas_reddit_gt_data.csv',lineterminator='\n')
 # gt = gt.reset_index(drop=True)[(~gt['Israel'].isnull()) & (~gt['Palestine'].isnull())]
@@ -224,43 +234,44 @@ data_dir = '/nas/eclairnas01/users/siyiguo/hamas_data/reddit/'
 # gt = gt.set_index('author')
 # ordered_user_index = gt.index
 
-# subreddit_dic = df.groupby('subreddit')['author'].apply(list).to_dict()
-# conflict_keys = [
-#     'israelexposed','exmuslim', 'Jewish', 'Judaism', 'IsraelCrimes', 'Palestinian_Violence', 'AntiSemitismInReddit',
-#     'IsraelUnderAttack', 'IsraelICYMI', 'MuslimLounge', 'Muslim', 'MuslimCorner']
-# conf_subreddit_dic = {key: subreddit_dic[key] for key in conflict_keys}
+subreddit_dic = df.groupby('subreddit')['author'].apply(list).to_dict()
+conflict_keys = [
+    'israelexposed','exmuslim', 'Jewish', 'Judaism', 'IsraelCrimes', 'Palestinian_Violence', 'AntiSemitismInReddit',
+    'IsraelUnderAttack', 'IsraelICYMI', 'MuslimLounge', 'Muslim', 'MuslimCorner']
+conf_subreddit_dic = {key: subreddit_dic[key] for key in conflict_keys}
 
-# dic = {u:i for i,u in enumerate(list(ordered_user_index))}
+dic = {u:i for i,u in enumerate(list(ordered_user_index))}
 
-# def fn_b(lst):
-#     result = []
-#     for l in lst:
-#         if conf_subreddit_dic.get(l):
-#             result.extend(conf_subreddit_dic.get(l))
+def fn_b(lst):
+    result = []
+    for l in lst:
+        if conf_subreddit_dic.get(l):
+            result.extend(conf_subreddit_dic.get(l))
     
-#     return list(set([dic[r] for r in result if dic.get(r) is not None]))
+    return list(set([dic[r] for r in result if dic.get(r) is not None]))
 
-# tqdm.pandas()
+tqdm.pandas()
 
-# user_links = df.groupby('author')['subreddit'].apply(lambda x: list(set(x))).progress_apply(fn_b)
-# user_links = user_links.loc[ordered_user_index,]
-# max_links_len = user_links.apply(len).max()
-# logging.info(f"user links: max_links_len={max_links_len}, avg links len = {user_links.apply(len).mean()}, std links len={user_links.apply(len).std()}")
+user_links = df.groupby('author')['subreddit'].apply(lambda x: list(set(x))).progress_apply(fn_b)
+user_links = user_links.loc[ordered_user_index,]
+max_links_len = user_links.apply(len).max()
+logging.info(f"user links: max_links_len={max_links_len}, avg links len = {user_links.apply(len).mean()}, std links len={user_links.apply(len).std()}")
 
-# del df
-# gc.collect()
+del df
+gc.collect()
 
-# user_links_array = user_links.tolist()
-# user_links_array = np.array([(n+[-1]*max_links_len)[:max_links_len] for n in user_links_array])
-# logging.info(f'shape of np array for the user links data: {user_links_array.shape}')
-# pickle.dump(user_links_array, open(data_dir+'links_data_small.pkl','wb'))
-
-user_links_array = pickle.load(open(data_dir+'links_data_small.pkl','rb'))
-links_len = user_links_array.shape[1] - (user_links_array==-1).sum(axis=1)
-logging.info(f"user links: max_links_len={links_len.max()}, avg links len = {links_len.mean()}, std links len={links_len.std()}")
-user_links_array = user_links_array[:,:1800]
-logging.info(user_links_array.shape)
+user_links_array = user_links.tolist()
+user_links_array = np.array([(n+[-1]*max_links_len)[:max_links_len] for n in user_links_array])
+user_links_array = user_links_array[:,:1500]
+logging.info(f'shape of np array for the user links data: {user_links_array.shape}')
 pickle.dump(user_links_array, open(data_dir+'links_data_small_trunc.pkl','wb'))
+
+# user_links_array = pickle.load(open(data_dir+'links_data_small.pkl','rb'))
+# links_len = user_links_array.shape[1] - (user_links_array==-1).sum(axis=1)
+# logging.info(f"user links: max_links_len={links_len.max()}, avg links len = {links_len.mean()}, std links len={links_len.std()}")
+# user_links_array = user_links_array[:,:1800]
+# logging.info(user_links_array.shape)
+# pickle.dump(user_links_array, open(data_dir+'links_data_small_trunc.pkl','wb'))
 
 
 

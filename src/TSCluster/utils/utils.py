@@ -103,7 +103,7 @@ def read_config(args):
     args['n_attn_head'] = 4
     args['binarize_gt'] = False
     args['dropout'] = 0.3
-    args['n_cluster'] = 10
+    args['n_cluster'] = 3
     args['tr_frac'] = 0.8
     
     # read args in config file

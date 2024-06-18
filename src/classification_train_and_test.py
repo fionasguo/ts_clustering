@@ -1,5 +1,6 @@
 import os
 import time
+import random
 import logging
 import pickle
 import numpy as np
@@ -17,11 +18,12 @@ from TSCluster import SimSiam, Trainer
 from TSCluster import plot_tsne
 
 
-def create_classification_dataset(data_tuple,batch_size):
+def create_classification_dataset(data_tuple,batch_size,balance_data=False):
     """
     create tf.data.Dataset from np arrays
     data_tuple: ((ts_data,aug_data), (indices,links), y)
         ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
+    balance_data: balance between different label classes, binary for now.
     """
     X,_, y = data_tuple
     ts_data = X[0]
@@ -31,6 +33,22 @@ def create_classification_dataset(data_tuple,batch_size):
         'values':ts_data[2],
         'feat':ts_data[3]
     }
+
+    # balance training data
+    if balance_data:
+        logging.info(f"before balancing data, len={y.shape}, sum={np.sum(y)}, ts_data timestamps shape={ts_data['timestamps'].shape}")
+        mask = (y==1)
+        n_pos = np.sum(mask)
+        idx = list(range(len(y)))
+        random.shuffle(idx)
+        ridx = idx[:5*n_pos+2]
+        mask[ridx] = 1
+        ts_data['demo'] = ts_data['demo'][mask]
+        ts_data['timestamps'] = ts_data['timestamps'][mask]
+        ts_data['values'] = ts_data['values'][mask]
+        ts_data['feat'] = ts_data['feat'][mask]
+        y = y[mask]
+        logging.info(f"after balancing data, len={y.shape}, sum={np.sum(y)}, ts_data timestamps shape={ts_data['timestamps'].shape}")
 
     if len(np.unique(y)) > 2:
         # one-hot
@@ -83,7 +101,7 @@ def build_classifier(args,simsiam=None):
 
 def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     # data
-    train_dataset = create_classification_dataset(train_data, args['batch_size'])
+    train_dataset = create_classification_dataset(train_data, args['batch_size'],balance_data=True)
     val_dataset = create_classification_dataset(val_data, args['batch_size'])
     
     callbacks = [
@@ -138,14 +156,19 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     tr_emb = embedding_model.predict(train_dataset.map(lambda X, y: X))
     pickle.dump(tr_emb,open(args['output_dir']+'/classifier_train_embeddings.pkl','wb'))
     tr_labels = np.asarray(list(train_dataset.map(lambda X,y:y)))
-    if tr_labels.shape[-1] == 1:
+    print(tr_labels.shape)
+    if args['n_classes'] == 2:
         tr_labels = tr_labels.flatten()
+        print(tr_labels.shape)
     else:
         tr_labels = tr_labels.reshape((-1,tr_labels.shape[-1]))
+        print(tr_labels.shape)
         tr_labels = np.argmax(tr_labels,axis=1).flatten()
+        print(tr_labels.shape)
+    logging.info(f"tr_emb shape={tr_emb.shape}, tr_labels shape={tr_labels.shape}")
     val_emb = embedding_model.predict(val_dataset.map(lambda X, y: X))
     val_labels = np.asarray(list(val_dataset.map(lambda X,y:y)))
-    if val_labels.shape[-1] == 1:
+    if args['n_classes'] == 2:
         val_labels = val_labels.flatten()
     else:
         val_labels = val_labels.reshape((-1,val_labels.shape[-1]))
@@ -204,7 +227,7 @@ def test_classifier(test_data, args, classifier):
     test_emb = embedding_model.predict(test_dataset.map(lambda X, y: X))
     pickle.dump(test_emb,open(args['output_dir']+'/classifier_test_embeddings.pkl','wb'))
     test_labels = np.asarray(list(test_dataset.map(lambda X,y:y)))
-    if test_labels.shape[-1] == 1:
+    if args['n_classes'] == 2:
         test_labels = test_labels.flatten()
     else:
         test_labels = test_labels.reshape((-1,test_labels.shape[-1]))

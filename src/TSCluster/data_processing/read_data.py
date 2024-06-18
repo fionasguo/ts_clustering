@@ -192,7 +192,7 @@ def create_dataset(data,batch_size):
         'feat':aug_data[3]
     }
 
-    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data,indices,links)).batch(batch_size,drop_remainder=True)
+    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data,indices,links)).shuffle(buffer_size=10*batch_size).batch(batch_size,drop_remainder=True)
 
 def binarize_gt(gt):
     biggest_cluster = np.max(gt)
@@ -322,7 +322,7 @@ def read_data(
         logging.info(f"tr_data shape={tr_data[0][1].shape}, tr_gt shape={tr_gt.shape}, #label '1'={np.sum(tr_gt)}")
         logging.info(f"te_data shape={te_data[0][1].shape}, te_gt shape={te_gt.shape}, #label '1'={np.sum(te_gt)}")
         if links_data is not None: logging.info(f"tr indices shape={tr_links_data[0].shape}, tr_links shape={tr_links_data[1].shape}")
-        
+
     args['n_feat'] = n_feat
     args['demo_dim'] = demo_dim
 

@@ -1,5 +1,7 @@
+import sys
 import logging
 import numpy as np
+import random
 from itertools import combinations
 
 import tensorflow as tf
@@ -177,10 +179,23 @@ def prepare_link_data(emb,indices,links,batch_size):
     idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
     expanded_links = tf.gather(links,indices=idx_to_links)
     y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
+    logging.info(f"y_link shape={y_link.shape}")
+    tf.print("y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
 
+    idxs = tf.range(y_link.shape[0])
+    ridxs = tf.concat([tf.cast(tf.random.shuffle(idxs)[:batch_size],dtype=tf.int32),tf.reshape(tf.cast(tf.where(y_link==1),dtype=tf.int32),[-1])],0)
+    emb1,emb2,y_link = tf.gather(emb1, ridxs), tf.gather(emb2, ridxs), tf.gather(y_link, ridxs)
+
+    # num_pos = tf.reduce_sum(y_link)
+    # mask = (y_link == 1)
+    # for _ in range(3*num_pos+2):
+    #     mask[random.randrange(batch_size)] = 1
+    # emb1,emb2,y_link =  tf.boolean_mask(emb1,mask), tf.boolean_mask(emb2,mask), tf.boolean_mask(y_link,mask)  
+    
+    logging.info(f"after reducing, mask={ridxs.shape}, emb1 shape={emb1.shape}, emb2 shape={emb2.shape}, y_link shape={y_link.shape}")
+    tf.print("y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
     return emb1,emb2,y_link
     
-
 
 class SimSiam(Model):
     def __init__(self, args):

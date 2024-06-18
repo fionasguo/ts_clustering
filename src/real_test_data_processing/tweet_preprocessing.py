@@ -86,7 +86,7 @@ def preprocess_tweet(tweet):
     # remove usernames
     # tweet = re.sub('@[^\s]+', '@user', tweet)
     # remove the # in hashtag and split hashtags
-    # tweet = split_hashtag(tweet)
+    tweet = split_hashtag(tweet)
     # remove hashtags
     # tweet = re.sub('#[^\s]+', '', tweet)
     # emojis to description

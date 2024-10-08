@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import random
 import logging
 import tensorflow as tf
 
@@ -180,19 +181,56 @@ def create_dataset(data,batch_size):
     """
     ((ts_data,aug_data),(indices,links)) = data
     ts_data = {
-        'demo':ts_data[0],
-        'timestamps':ts_data[1],
-        'values':ts_data[2],
-        'feat':ts_data[3]
+        'demo':tf.convert_to_tensor(ts_data[0],dtype=tf.float32),
+        'timestamps':tf.convert_to_tensor(ts_data[1],dtype=tf.float32),
+        'values':tf.convert_to_tensor(ts_data[2],dtype=tf.float32),
+        'feat':tf.convert_to_tensor(ts_data[3],dtype=tf.float32)
     }
     aug_data = {
-        'demo':aug_data[0],
-        'timestamps':aug_data[1],
-        'values':aug_data[2],
-        'feat':aug_data[3]
+        'demo':tf.convert_to_tensor(aug_data[0],dtype=tf.float32),
+        'timestamps':tf.convert_to_tensor(aug_data[1],dtype=tf.float32),
+        'values':tf.convert_to_tensor(aug_data[2],dtype=tf.float32),
+        'feat':tf.convert_to_tensor(aug_data[3],dtype=tf.float32),
     }
 
-    return tf.data.Dataset.from_tensor_slices((ts_data,aug_data,indices,links)).shuffle(buffer_size=10*batch_size).batch(batch_size,drop_remainder=True)
+    # NULL_TS_DATA = {
+    #         'demo':tf.fill(tf.shape(ts_data['demo']), tf.constant(float('nan'), dtype=tf.float32)),
+    #         'timestamps':tf.fill(tf.shape(ts_data['timestamps']), tf.constant(float('nan'), dtype=tf.float32)),
+    #         'values':tf.fill(tf.shape(ts_data['values']), tf.constant(float('nan'), dtype=tf.float32)),
+    #         'feat':tf.fill(tf.shape(ts_data['feat']), tf.constant(float('nan'), dtype=tf.float32)),
+    #     }
+
+    def fetch_random_link(links):
+        effective_links = tf.gather_nd(links,tf.where(links!=-1))
+        tf.print('fetch_random_link - effective links',effective_links)
+        idx = tf.random.shuffle(effective_links)[0]
+        idx = tf.where(indices==idx)
+        tf.print('fetch_random_link - tf where idx',idx)
+        if links[0] == -1 or tf.shape(idx)[0]==0:
+            linked = {
+                'demo':ts_data['demo'][0],
+                'timestamps':ts_data['timestamps'][0],
+                'values':ts_data['values'][0],
+                'feat':ts_data['feat'][0]
+            }
+            tf.print('fetch random link - linked output nan',linked)
+            return linked
+        tf.print('fetch_random_link - idx[0][0]',idx[0][0])
+        linked = {
+            'demo':ts_data['demo'][idx[0][0]],
+            'timestamps':ts_data['timestamps'][idx[0][0]],
+            'values':ts_data['values'][idx[0][0]],
+            'feat':ts_data['feat'][idx[0][0]]
+        }
+        tf.print('fetch random link - linked output',linked)
+        return linked
+
+    dataset = tf.data.Dataset.from_tensor_slices((ts_data,aug_data,indices,links))
+    dataset = dataset.shuffle(buffer_size=10*batch_size)
+    dataset = dataset.map(lambda ts_data,aug_data,indices,links: (ts_data,aug_data,indices,links,fetch_random_link(links)))
+    dataset = dataset.batch(batch_size, drop_remainder=True)
+
+    return dataset
 
 def binarize_gt(gt):
     biggest_cluster = np.max(gt)

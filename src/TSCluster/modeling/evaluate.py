@@ -5,11 +5,11 @@ import numpy as np
 import math
 from sklearn.manifold import TSNE
 from sklearn.cluster import DBSCAN,MiniBatchKMeans
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report,confusion_matrix
 import pickle
 import tensorflow as tf
 
-from .model import SimSiam
+from .model import SimSiam #, make_combinations, prepare_link_data
 # from .clustering import kmeans_clustering
 
 
@@ -49,34 +49,11 @@ def plot_tsne(feats, labels, fig_save_path: str):
 
 ########################################################################################
 
-def make_combinations(array,batch_size):
-    size = tf.shape(array)[0]
-    # Make 2D grid of indices
-    r = tf.range(size)
-    ii, jj = tf.meshgrid(r, r, indexing='ij')
-    # Take pairs of indices where the first is less or equal than the second
-    m = ii < jj
-    m.set_shape([batch_size,batch_size])
-    output_size = int((batch_size-1)/2*batch_size)
-    return tf.gather(array, tf.reshape(tf.boolean_mask(ii, m),[output_size])),tf.gather(array,tf.reshape(tf.boolean_mask(jj, m),[output_size]))
 
-def prepare_link_data(emb,indices,links,batch_size):
-    """
-    make pair combinations of all rows in emb, and label them with 1 if there's a link exists between them
 
-    emb: tensor batch_size * hidden_dim
-    indices: the index of each emb, (batch_size,)
-    links: for each emb, the indicies of other embs that have a link with, batch_sizw * max # links (padded with -1)
-    """
-    emb1, emb2 = make_combinations(emb,batch_size)
-    idx, tgt_idx = make_combinations(indices,batch_size)
-    idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
-    expanded_links = tf.gather(links,indices=idx_to_links)
-    y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
 
-    return emb1,emb2,y_link
 
-def evaluate_link_pred(emb, indices, links, simsiam, args):
+def evaluate_link_pred(emb, indices, links, tr_indices, tr_links, simsiam, args):
     auc = tf.keras.metrics.AUC()
     f1 = tf.keras.metrics.F1Score(average=None,threshold=0.5)
     
@@ -87,14 +64,19 @@ def evaluate_link_pred(emb, indices, links, simsiam, args):
         tmp_indices = indices[b*args['batch_size']:(b+1)*args['batch_size']]
         tmp_links = links[b*args['batch_size']:(b+1)*args['batch_size']]
 
+        data_linked = fetch_linked_data(indices, links, tr_indices, tr_links)
+    
+
         emb1,emb2,y_link = prepare_link_data(tmp_emb,tmp_indices,tmp_links,args['batch_size'])
         logging.info(f"y_link shape={y_link.shape},sum={tf.reduce_sum(y_link)}")
         y_link_pred = simsiam.link_predictor.predict((emb1,emb2),batch_size=args['batch_size'])
         y_link = y_link[:,np.newaxis]
 
-        auc.update_state(y_link,y_link_pred)
-        f1.update_state(y_link,y_link_pred)
+        auc.update_state(tf.cast(y_link, dtype=tf.float32),tf.cast(y_link_pred, dtype=tf.float32))
+        f1.update_state(tf.cast(y_link, dtype=tf.float32),tf.cast(y_link_pred, dtype=tf.float32))
         logging.info(f"batch {b}, auc={auc.result()}, f1={f1.result()}")
+        logging.info(f"link prediction confusion matrix:\n{confusion_matrix(tf.cast(y_link, dtype=tf.float32),tf.cast(y_link_pred, dtype=tf.float32))}")
+        logging.info(f"link prediction classification report:\n{classification_report(tf.cast(y_link, dtype=tf.float32),tf.cast(y_link_pred, dtype=tf.float32))}")
 
     #logging.info(f"Link Pred Evaluation:\n{classification_report(y_link,y_link_pred)}")
     logging.info(f"final AUC = {auc.result()},final F1 = {f1.result()}")
@@ -127,8 +109,9 @@ def evaluate(data, modelpath, args):
     data: {'train':(tr_data,tr_links_data,tr_gt), 'val':(val_data,val_links_data,val_gt), 'test':(te_data,te_links_data,te_gt)}
     """
     labels = data['test'][2]
-    data1, data2 = data['test'][0]
+    data1,_ = data['test'][0]
     indices,links = data['test'][1]
+    tr_indices,tr_links = data['train'][1]
     
     # load model
     simsiam = SimSiam(args)
@@ -151,6 +134,34 @@ def evaluate(data, modelpath, args):
     pickle.dump(dbscan_preds,open(args['output_dir']+'/test_data_dbscan_preds.pkl','wb'))
 
     # evaluate link prediction
-    evaluate_link_pred(embeddings, indices, links, simsiam, args)
+    evaluate_link_pred(embeddings, indices, links, tr_indices, tr_links, simsiam, args)
 
     return # preds
+
+
+def make_combinations(array,batch_size):
+    size = tf.shape(array)[0]
+    # Make 2D grid of indices
+    r = tf.range(size)
+    ii, jj = tf.meshgrid(r, r, indexing='ij')
+    # Take pairs of indices where the first is less or equal than the second
+    m = ii < jj
+    m.set_shape([batch_size,batch_size])
+    output_size = int((batch_size-1)/2*batch_size)
+    return tf.gather(array, tf.reshape(tf.boolean_mask(ii, m),[output_size])),tf.gather(array,tf.reshape(tf.boolean_mask(jj, m),[output_size]))
+
+def prepare_link_data(emb,indices,links,batch_size):
+    """
+    make pair combinations of all rows in emb, and label them with 1 if there's a link exists between them
+
+    emb: tensor batch_size * hidden_dim
+    indices: the index of each emb, (batch_size,)
+    links: for each emb, the indicies of other embs that have a link with, batch_sizw * max # links (padded with -1)
+    """
+    emb1, emb2 = make_combinations(emb,batch_size)
+    idx, tgt_idx = make_combinations(indices,batch_size)
+    idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
+    expanded_links = tf.gather(links,indices=idx_to_links)
+    y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
+
+    return emb1,emb2,y_link

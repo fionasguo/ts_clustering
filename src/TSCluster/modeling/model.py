@@ -156,7 +156,9 @@ def get_link_predictor(input_dim, hid_dim, weight_decay):
     return model
 
 def make_combinations(array,batch_size):
+    logging.info(f"make comb  {array}   {tf.shape(array)}")
     size = tf.shape(array)[0]
+    # size = array.shape[0]
     # Make 2D grid of indices
     r = tf.range(size)
     ii, jj = tf.meshgrid(r, r, indexing='ij')
@@ -165,37 +167,50 @@ def make_combinations(array,batch_size):
     m.set_shape([batch_size,batch_size])
     output_size = int((batch_size-1)/2*batch_size)
     return tf.gather(array, tf.reshape(tf.boolean_mask(ii, m),[output_size])),tf.gather(array,tf.reshape(tf.boolean_mask(jj, m),[output_size]))
+    
 
-def prepare_link_data(emb,indices,links,batch_size):
-    """
-    make pair combinations of all rows in emb, and label them with 1 if there's a link exists between them
-
-    emb: tensor batch_size * hidden_dim
-    indices: the index of each emb, (batch_size,)
-    links: for each emb, the indicies of other embs that have a link with, batch_sizw * max # links (padded with -1)
-    """
+def prepare_link_data(emb, emb_linked, indices, links, batch_size, non_nan_mask):
+    # negative examples
     emb1, emb2 = make_combinations(emb,batch_size)
     idx, tgt_idx = make_combinations(indices,batch_size)
     idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
     expanded_links = tf.gather(links,indices=idx_to_links)
     y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
-    logging.info(f"y_link shape={y_link.shape}")
-    tf.print("y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
-
+    tf.print("1 neg samples y_link shape",tf.shape(y_link))
+    tf.print("1 y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
+    # select batch_size number of negative examples
     idxs = tf.range(y_link.shape[0])
-    ridxs = tf.concat([tf.cast(tf.random.shuffle(idxs)[:batch_size],dtype=tf.int32),tf.reshape(tf.cast(tf.where(y_link==1),dtype=tf.int32),[-1])],0)
+    ridxs = tf.concat([tf.cast(tf.random.shuffle(idxs)[:batch_size*2],dtype=tf.int32),tf.reshape(tf.cast(tf.where(y_link==1),dtype=tf.int32),[-1])],0)
     emb1,emb2,y_link = tf.gather(emb1, ridxs), tf.gather(emb2, ridxs), tf.gather(y_link, ridxs)
+    tf.print("2 y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
+    # idxs = tf.range(tf.shape(y_link)[0])
+    # ridxs = tf.cast(tf.random.shuffle(idxs)[:batch_size*2],dtype=tf.int32)
+    # # shuffled_ridxs = tf.random.shuffle(rand_idxs)
+    # emb1,emb2,y_link = tf.gather(emb1, ridxs), tf.gather(emb2, ridxs), tf.gather(y_link, ridxs)
+    tf.print("2 neg samples y_link shape",tf.shape(y_link))
+    
+    neg_mask = tf.equal(y_link, 0)
+    emb1 = tf.boolean_mask(emb1, neg_mask)
+    emb2 = tf.boolean_mask(emb2, neg_mask)
+    y_link = tf.boolean_mask(y_link, neg_mask)
 
-    # num_pos = tf.reduce_sum(y_link)
-    # mask = (y_link == 1)
-    # for _ in range(3*num_pos+2):
-    #     mask[random.randrange(batch_size)] = 1
-    # emb1,emb2,y_link =  tf.boolean_mask(emb1,mask), tf.boolean_mask(emb2,mask), tf.boolean_mask(y_link,mask)  
-    
-    logging.info(f"after reducing, mask={ridxs.shape}, emb1 shape={emb1.shape}, emb2 shape={emb2.shape}, y_link shape={y_link.shape}")
-    tf.print("y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
+    tf.print("3 neg samples y_link shape",tf.shape(y_link))
+    tf.print("3 neg samples y_link sum=",tf.reduce_sum(y_link)) # sys.stdout
+
+    # pos examples
+    # filter out nan's
+    tf.print("emb_linked raw shape",tf.shape(emb_linked))
+    # non_nan_mask = ~tf.math.reduce_any(tf.math.is_nan(emb_linked), axis=1)
+    # emb_linked = tf.boolean_mask(emb_linked, non_nan_mask)
+    emb1_non_nan = tf.boolean_mask(emb, non_nan_mask)
+    tf.print(f"emb_linked non_nan shape={tf.shape(emb_linked)}, emb1 non nan={tf.shape(emb1_non_nan)}")
+    emb1 = tf.concat([emb1, emb1_non_nan], 0)
+    emb2 = tf.concat([emb2, emb_linked], 0)
+    y_link = tf.concat([y_link, tf.ones(shape=(tf.shape(emb_linked))[0],)], 0)
+    tf.print("after concat neg and pos samples, y_link sum=",tf.reduce_sum(y_link))
+
     return emb1,emb2,y_link
-    
+
 
 class SimSiam(Model):
     def __init__(self, args):
@@ -254,7 +269,8 @@ class SimSiam(Model):
         # Calculate cosine similarity of all original data in the batch
         cos_sim = tf.linalg.matmul(p1,p2,transpose_b=True)
         # Mask out cosine similarity to itself
-        mask = tf.eye(cos_sim.shape[0], dtype=tf.dtypes.bool)
+        logging.info(f"InfoNCE loss {cos_sim}, {tf.shape(cos_sim)}")
+        mask = tf.eye(tf.shape(cos_sim)[0], dtype=tf.dtypes.bool)
         cos_sim = tf.where(mask, -9e15, cos_sim)
         
         # InfoNCE loss
@@ -265,11 +281,11 @@ class SimSiam(Model):
 
     def train_step(self, data):
         # Unpack the data - (ts_data,link_data)
-        ds_one, ds_two, indices, links = data
-        print(ds_one)
-        print(ds_two)
-        print(indices)
-        print(links)
+        ds_one, ds_two, indices, links, linked_ds = data # linked_ds can contain nan
+
+        logging.info(indices)
+        logging.info(links)
+        logging.info(linked_ds)
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:
@@ -283,14 +299,35 @@ class SimSiam(Model):
                 loss = self.compute_SimSiam_loss(p1, z2) / 2 + self.compute_SimSiam_loss(p2, z1) / 2
             elif self.loss_fn == 'InfoNCE':
                 loss = self.compute_InfoNCE_loss(p1,p2,temperature=self.args['temperature'])
+            
             # link prediction loss
             if links is not None:
-                emb1,emb2,y_link = prepare_link_data(p1,indices,links,self.args['batch_size'])
-                y_link_pred = self.link_predictor((emb1,emb2))
+                # filter out nan's
+                # non_nan_mask = ~tf.math.reduce_any(tf.math.is_nan(linked_ds['demo']), axis=1)
+                # tf.print('1 model linked_ds', tf.shape(linked_ds))
+                non_nan_mask = tf.reshape(links[:,0]==-1,[-1])
+                linked_ds = {k: tf.boolean_mask(v, non_nan_mask) for k,v in linked_ds.items()}
+                # tf.print('2 model linked_ds', tf.shape(linked_ds))
+                z_linked = self.encoder(linked_ds)
+                p_linked = self.predictor(z_linked)
+                # tf.print('3 model p_linked', tf.shape(p_linked))
+
+                # emb1,emb2,y_link = prepare_link_data(tf.boolean_mask(p1, non_nan_mask), p_linked, indices, links, self.args['batch_size'])
+                emb1,emb2,y_link = prepare_link_data(p1, p_linked, indices, links, self.args['batch_size'], non_nan_mask)
+                y_link_pred = self.link_predictor((emb1, emb2))
+
                 bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
                 bce_loss = bce(y_link,y_link_pred)
                 loss = loss + bce_loss
-                tf.print("bce_loss: ", bce_loss)
+                tf.print("link bce_loss: ", bce_loss)
+
+                # emb1,emb2,y_link = prepare_link_data(p1,indices,links,self.args['batch_size'])
+                # if emb1 is not None:
+                #     y_link_pred = self.link_predictor((emb1,emb2))
+                #     bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+                #     bce_loss = bce(y_link,y_link_pred)
+                #     loss = loss + bce_loss
+                #     tf.print("link bce_loss: ", bce_loss)
 
         # Compute gradients and update the parameters.
         if links is not None:
@@ -309,3 +346,45 @@ class SimSiam(Model):
 
         return {"loss": self.loss_tracker.result()}
     
+
+# def DEPRECATED_prepare_link_data(emb,indices,links,batch_size):
+#     """
+#     make pair combinations of all rows in emb, and label them with 1 if there's a link exists between them
+#     because signals are too sparse, only pick balanced amount of negative samples
+
+#     emb: tensor batch_size * hidden_dim
+#     indices: the index of each emb, (batch_size,)
+#     links: for each emb, the indicies of other embs that have a link with, batch_size * max # links (padded with -1)
+#     """
+#     emb1, emb2 = make_combinations(emb,batch_size)
+#     idx, tgt_idx = make_combinations(indices,batch_size)
+#     idx_to_links = tf.where(tf.equal(indices,idx[...,None]))[:,-1]
+#     expanded_links = tf.gather(links,indices=idx_to_links)
+#     y_link = tf.cast(tf.reduce_any(tf.cast(tf.equal(tgt_idx[...,None],expanded_links),tf.bool),axis=1),dtype=tf.float32)
+#     logging.info(f"y_link shape={y_link.shape}")
+#     tf.print("y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
+
+#     # balance amount of pos and neg data
+#     idxs = tf.range(y_link.shape[0])
+#     pos_idxs = tf.reshape(tf.cast(tf.where(y_link==1),dtype=tf.int32),[-1])
+#     n_pos = tf.reduce_sum(y_link)
+#     tf.print("n_pos=",n_pos,output_stream=sys.stdout)
+#     if tf.equal(n_pos,0):
+#         return None, None, None
+    
+#     neg_mask = ~tf.reduce_any(tf.equal(tf.expand_dims(idxs, 1), pos_idxs), axis=1)
+#     neg_idxs = tf.boolean_mask(idxs, neg_mask)
+#     rand_neg_idxs = tf.cast(tf.random.shuffle(neg_idxs)[:n_pos+2],dtype=tf.int32)
+#     ridxs = tf.concat([rand_neg_idxs,pos_idxs],0)
+#     shuffled_ridxs = tf.random.shuffle(ridxs)
+#     emb1,emb2,y_link = tf.gather(emb1, shuffled_ridxs), tf.gather(emb2, shuffled_ridxs), tf.gather(y_link, shuffled_ridxs)
+#     logging.info(f"after reducing, mask={ridxs.shape}, emb1 shape={emb1.shape}, emb2 shape={emb2.shape}, y_link shape={y_link.shape}")
+#     tf.print("after ruducing, y_link sum=",tf.reduce_sum(y_link),output_stream=sys.stdout)
+
+#     # num_pos = tf.reduce_sum(y_link)
+#     # mask = (y_link == 1)
+#     # for _ in range(3*num_pos+2):
+#     #     mask[random.randrange(batch_size)] = 1
+#     # emb1,emb2,y_link =  tf.boolean_mask(emb1,mask), tf.boolean_mask(emb2,mask), tf.boolean_mask(y_link,mask)  
+    
+#     return emb1,emb2,y_link

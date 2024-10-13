@@ -4,7 +4,7 @@ from itertools import combinations
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras.layers import Embedding, Input, Dense, Lambda, Add, Concatenate, ReLU, BatchNormalization
+from tensorflow.keras.layers import Embedding, Input, Dense, Lambda, Add, Concatenate, ReLU, BatchNormalization, Reshape
 from tensorflow.keras import regularizers, Model
 
 from .layers import CVE, Attention, Transformer
@@ -18,6 +18,7 @@ def get_encoder(
         n_attn_head: int = 4, 
         dropout: float = 0.2, 
         demo_dim: int = 0,
+        demo_categorical: int = 0,
         tau: float = 1.0,
         lam: float = 1.0
     ):
@@ -32,6 +33,7 @@ def get_encoder(
         n_attn_head: number of transformer attention heads
         dropout: dropout rate
         demo_dim: dim of demographic vector if zero means we don't have it
+        demo_categorical: if > 0, demo_dim is the number of categories, and we will embed it
         tau: scalar that the timestamp embedding is multiplied with, controls how much timestamp contributes to the final representation
         lam: scalar that the feat and value embedding is multiplied with, controls how much features and values contributes to the final representation
 
@@ -75,8 +77,12 @@ def get_encoder(
 
     demo = Input(shape=(demo_dim,))
     if demo_dim > 0:
+        if demo_categorical > 0:
+            print('demo_categorical')
+            demo = Embedding(demo_categorical, emb_dim)(demo)
+            demo = Reshape(target_shape=(-1,))(demo)
+            demo = Dense(demo_dim, activation='tanh')(demo)
         # embed demographic vector - 2 layers of FFN
-        
         demo_enc = Dense(2*emb_dim, activation='tanh')(demo)
         demo_enc = Dense(emb_dim, activation='tanh')(demo_enc)
         # concat to demographic embedding
@@ -195,6 +201,7 @@ class SimSiam(Model):
             n_attn_head=self.args['n_attn_head'], 
             dropout=self.args['dropout'], 
             demo_dim=self.args['demo_dim'],
+            demo_categorical=self.args['demo_categorical'],
             tau=self.args['tau'],
             lam=self.args['lam']
         )

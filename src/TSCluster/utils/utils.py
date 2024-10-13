@@ -54,8 +54,9 @@ def read_command_args(args,root_dir):
     parser.add_argument('--temperature', type=float, required=False, default=0.2, help='temperature scaling')
     parser.add_argument('--trained_classifier_model', type=str, required=False, default=None, help='if testing, it is optional to provide a trained classifier model weight dir')
     parser.add_argument('--tau', type=float, required=False, default=1.0, help='controls how much timestamp contributes to the final representation')
-    parser.add_argument('--lam', type=float, required=False, default=1.0, help='controls how much timestamp textual features to the final representation')
+    parser.add_argument('--lam', type=float, required=False, default=1.0, help='controls how much textual features to the final representation')
     parser.add_argument('--links_dir', type=str, required=False, default=None, help='retweet/following link prediction data directory')
+    parser.add_argument('--demo_categorical', type=int, required=False, default=0, help='if the demographic data is categorical, it is the int of number of categories')
 
     command_args = parser.parse_args()
 
@@ -82,6 +83,7 @@ def read_command_args(args,root_dir):
     args['seed'] = int(command_args.seed)
     args['tau'] = float(command_args.tau)
     args['lam'] = float(command_args.lam)
+    args['demo_categorical'] = int(command_args.demo_categorical)
         
     return mode, args
 

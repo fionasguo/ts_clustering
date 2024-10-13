@@ -249,7 +249,7 @@ def read_data(
 
     n_feat = ts_data.shape[2]
     logging.info(f"n_feat={n_feat}")
-    demo_dim = 1
+    demo_dim = 0
     
     demo_data = None
     if demo_data_dir:

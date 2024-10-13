@@ -13,7 +13,6 @@ from tensorflow.keras.utils import to_categorical
 
 from TSCluster import set_seed, get_training_args, create_logger
 from TSCluster import read_data
-from TSCluster import SimSiam, Trainer
 from TSCluster import plot_tsne
 
 
@@ -24,7 +23,7 @@ def build_classifier(args,input_dim=768):
     input_x = Input((input_dim,))
     x = Dense(args['embed_dim'],activation='relu')(input_x)
     x = Dropout(args['dropout'])(x)
-    x = Dense(3,activation='softmax')(x)
+    x = Dense(n_classes,activation='softmax')(x)
 
     classifier = Model(input_x, x, name='classifier')
 
@@ -38,8 +37,12 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     ]
     
     classifier = build_classifier(args)
-    
-    loss_fn = losses.CategoricalCrossentropy(from_logits=False)
+    if args['n_classes'] == 2:
+        loss_fn = losses.BinaryCrossentropy(from_logits=False)
+    elif args['n_classes'] > 2:
+        loss_fn = losses.CategoricalCrossentropy(from_logits=False)
+    else:
+        raise ValueError('Number of classes should be at least 2')
 
     classifier.compile(
         loss=loss_fn,
@@ -67,6 +70,18 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
 
     # plot tsne
     logging.info("plot tsne for trianing and val data")
+    train_emb = np.asarray(list(train_data.map(lambda X,y:X)))
+    train_emb = train_emb.reshape((-1,train_emb.shape[-1]))
+    train_labels = np.asarray(list(train_data.map(lambda X,y:y)))
+    if train_labels.shape[-1] == 1 or args['n_classes']==2:
+        train_labels = train_labels.flatten()
+    else:
+        train_labels = train_labels.reshape((-1,train_labels.shape[-1]))
+        train_labels = np.argmax(train_labels,axis=1).flatten()
+    print(train_emb.shape,train_labels.shape)
+    plot_tsne(train_emb, train_labels, fig_save_path=args['output_dir']+'/classifier_train_data_')
+
+
     classifier.summary(print_fn=logging.info)
 
     return classifier
@@ -108,7 +123,7 @@ def test_classifier(test_data, args, classifier):
     test_preds = np.argmax(test_preds_conf,axis=1)
     test_labels = np.asarray(list(test_data.map(lambda X,y:y)))
     print(test_preds.shape,test_labels.shape)
-    if test_labels.shape[-1] == 1:
+    if test_labels.shape[-1] == 1 or args['n_classes']==2:
         test_labels = test_labels.flatten()
         print('1',test_labels.shape)
     else:
@@ -116,6 +131,11 @@ def test_classifier(test_data, args, classifier):
         test_labels = np.argmax(test_labels,axis=1).flatten()
         print('2',test_labels.shape)
     logging.info(classification_report(test_labels,test_preds))
+
+    # plot tsne
+    test_emb = np.asarray(list(test_data.map(lambda X,y:X)))
+    test_emb = test_emb.reshape((-1,test_emb.shape[-1]))
+    plot_tsne(test_emb, test_labels, fig_save_path=args['output_dir']+'/classifier_test_data_')
 
     return eval_results
 
@@ -147,7 +167,8 @@ def read_data(
         seed: int = 3
 ):  
     ts_data = pickle.load(open(ts_data_dir,'rb'))
-    ts_data = ts_data.reshape((ts_data.shape[0],ts_data.shape[2]))
+    if len(ts_data.shape) == 3:
+        ts_data = ts_data.reshape((ts_data.shape[0],ts_data.shape[2]))
 
     N = len(ts_data)
 
@@ -157,16 +178,17 @@ def read_data(
     gt = pickle.load(open(gt_data_dir,'rb'))
     gt = gt.astype(float)
 
-    if len(gt) != N:
-        raise ValueError('Dimension mismatch between TS and groundtruth data')
+    assert len(gt) == N, f'Dimension mismatch between TS and groundtruth data, {N} != {len(gt)}'
+    
     args['n_classes'] = len(np.unique(gt))
     logging.info(f"check gt data - n_classes={args['n_classes']},#nans={np.isnan(gt).sum()}")
-    # one-hot
-    encoder = LabelEncoder()
-    encoder.fit(gt)
-    gt = encoder.transform(gt)
-    # convert integers to dummy variables (i.e. one hot encoded)
-    gt = to_categorical(gt)
+    if args['n_classes'] > 2:
+        # one-hot
+        encoder = LabelEncoder()
+        encoder.fit(gt)
+        gt = encoder.transform(gt)
+        # convert integers to dummy variables (i.e. one hot encoded)
+        gt = to_categorical(gt)
 
     # train val test split
     if data_split == 'tr-val-te':

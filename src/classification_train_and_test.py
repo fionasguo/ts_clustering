@@ -23,7 +23,7 @@ def create_classification_dataset(data_tuple,batch_size):
     data_tuple: ((ts_data,aug_data), (indices,links), y)
         ts_data: list of lists [demo,timestamp_array,values_array,feat_dummy_array], each of these array shape (N * max_triplet_len)
     """
-    X,_, y = data_tuple
+    X, _, y = data_tuple
     ts_data = X[0]
     ts_data = {
         'demo':ts_data[0],
@@ -31,7 +31,7 @@ def create_classification_dataset(data_tuple,batch_size):
         'values':ts_data[2],
         'feat':ts_data[3]
     }
-
+    
     if len(np.unique(y)) > 2:
         # one-hot
         encoder = LabelEncoder()
@@ -39,7 +39,7 @@ def create_classification_dataset(data_tuple,batch_size):
         y = encoder.transform(y)
         # convert integers to dummy variables (i.e. one hot encoded)
         y = to_categorical(y)
-
+    
     return tf.data.Dataset.from_tensor_slices((ts_data,y)).batch(batch_size,drop_remainder=True)
 
 
@@ -131,28 +131,35 @@ def train_classifier(train_data,val_data,args,simsiam=None,savepath=None):
     logging.info('training finished. log:')
     logging.info(history.history)
 
-    # plot tsne
-    logging.info("plot tsne for trianing and val data")
     classifier.summary(print_fn=logging.info)
-    embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
-    tr_emb = embedding_model.predict(train_dataset.map(lambda X, y: X))
-    pickle.dump(tr_emb,open(args['output_dir']+'/classifier_train_embeddings.pkl','wb'))
-    tr_labels = np.asarray(list(train_dataset.map(lambda X,y:y)))
-    if tr_labels.shape[-1] == 1:
-        tr_labels = tr_labels.flatten()
-    else:
-        tr_labels = tr_labels.reshape((-1,tr_labels.shape[-1]))
-        tr_labels = np.argmax(tr_labels,axis=1).flatten()
-    val_emb = embedding_model.predict(val_dataset.map(lambda X, y: X))
-    val_labels = np.asarray(list(val_dataset.map(lambda X,y:y)))
-    if val_labels.shape[-1] == 1:
-        val_labels = val_labels.flatten()
-    else:
-        val_labels = val_labels.reshape((-1,val_labels.shape[-1]))
-        val_labels = np.argmax(val_labels,axis=1).flatten()
 
-    plot_tsne(tr_emb, tr_labels, fig_save_path=args['output_dir']+'/classifier_train_data_')
-    plot_tsne(val_emb, val_labels, fig_save_path=args['output_dir']+'/classifier_val_data_')
+    # # plot tsne
+    # logging.info("plot tsne for trianing and val data")
+    
+    # embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
+    # tr_emb = embedding_model.predict(train_dataset.map(lambda X, y: X))
+    # pickle.dump(tr_emb,open(args['output_dir']+'/classifier_train_embeddings.pkl','wb'))
+    # tr_labels = np.asarray(list(train_dataset.map(lambda X,y:y)))
+    # logging.info(f"tr_label_shape 1={tr_labels.shape}, tr_emb_shape={tr_emb.shape}")
+    # if tr_labels.shape[-1] == 1 or args['n_classes']==2:
+    #     tr_labels = tr_labels.flatten()
+    # else:
+    #     tr_labels = tr_labels.reshape((-1,tr_labels.shape[-1]))
+    #     tr_labels = np.argmax(tr_labels,axis=1).flatten()
+    # logging.info(f"tr_label_shape 2={tr_labels.shape}")
+    
+    # val_emb = embedding_model.predict(val_dataset.map(lambda X, y: X))
+    # val_labels = np.asarray(list(val_dataset.map(lambda X,y:y)))
+    # logging.info(f"val_label_shape 1={val_labels.shape}, val_emb_shape={val_emb.shape}")
+    # if val_labels.shape[-1] == 1 or args['n_classes']==2:
+    #     val_labels = val_labels.flatten()
+    # else:
+    #     val_labels = val_labels.reshape((-1,val_labels.shape[-1]))
+    #     val_labels = np.argmax(val_labels,axis=1).flatten()
+    # logging.info(f"val_label_shape 2={val_labels.shape}")
+    
+    # plot_tsne(tr_emb, tr_labels, fig_save_path=args['output_dir']+'/classifier_train_data_')
+    # plot_tsne(val_emb, val_labels, fig_save_path=args['output_dir']+'/classifier_val_data_')
 
     return classifier
 
@@ -199,19 +206,14 @@ def test_classifier(test_data, args, classifier):
     test_preds_conf = classifier.predict(test_dataset,batch_size=args['batch_size'])
     pickle.dump(test_preds_conf,open(args['output_dir']+'/classifier_test_preds_conf.pkl','wb'))
 
-    # plot tsne
-    embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
-    test_emb = embedding_model.predict(test_dataset.map(lambda X, y: X))
-    pickle.dump(test_emb,open(args['output_dir']+'/classifier_test_embeddings.pkl','wb'))
     test_labels = np.asarray(list(test_dataset.map(lambda X,y:y)))
-    if test_labels.shape[-1] == 1:
+    if test_labels.shape[-1] == 1 or args['n_classes']==2:
         test_labels = test_labels.flatten()
     else:
         test_labels = test_labels.reshape((-1,test_labels.shape[-1]))
         test_labels = np.argmax(test_labels,axis=1).flatten()
     pickle.dump(test_labels,open(args['output_dir']+'/classifier_test_gt_labels.pkl','wb'))
-    plot_tsne(test_emb, test_labels, fig_save_path=args['output_dir']+'/classifier_test_data_')
-
+    
     logging.info(f"Finished evaluating test data.\nLoss: {eval_results[0]}, Precision:{eval_results[1]}, Recall:{eval_results[2]}, AUC-ROC:{eval_results[3]}, F1 score:{eval_results[4]} {eval_results[5]} {eval_results[6]} {eval_results[7]} {eval_results[8]} {eval_results[9]} {eval_results[10]} {eval_results[11]} {eval_results[12]}")
     
     if args['n_classes'] == 2:
@@ -221,7 +223,14 @@ def test_classifier(test_data, args, classifier):
         logging.info(f"manual - AUC={roc_auc_score(test_labels,test_preds)}")
     else:
         test_preds = np.argmax(test_preds_conf,axis=1)
+    
     logging.info(classification_report(test_labels,test_preds))
+
+    # plot tsne
+    # embedding_model = Model(inputs=classifier.input, outputs=classifier.get_layer('embed_output').output)
+    # test_emb = embedding_model.predict(test_dataset.map(lambda X, y: X))
+    # pickle.dump(test_emb,open(args['output_dir']+'/classifier_test_embeddings.pkl','wb'))
+    # plot_tsne(test_emb, test_labels, fig_save_path=args['output_dir']+'/classifier_test_data_')
 
     return eval_results
 

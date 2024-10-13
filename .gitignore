@@ -4,7 +4,6 @@
 *.out
 *.h5
 *.png
-*.pkl
 build/*
 *tm_*
 *.egg-info
